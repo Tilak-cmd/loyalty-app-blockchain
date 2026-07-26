@@ -34,4 +34,17 @@ export const merchantApi = {
 export const points = {
   balanceByEmail: (email) => api.get(`/points/balance/${encodeURIComponent(email)}`),
   me: () => api.get("/points/me"),
+  redeem: (d) => api.post("/points/redeem", d),
+};
+
+export const merchantProductsApi = {
+  list: () => api.get("/merchant/products"),
+  create: (d) => api.post("/merchant/products", d),
+  update: (id, d) => api.put(`/merchant/products/${id}`, d),
+  delete: (id) => api.delete(`/merchant/products/${id}`),
+};
+
+export const publicMerchantApi = {
+  list: () => api.get("/merchants/public"),
+  products: (merchantId) => api.get(`/merchants/public/${merchantId}/products`),
 };

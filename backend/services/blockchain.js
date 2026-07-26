@@ -10,6 +10,7 @@ const TOKEN_ABI = [
 
 const FACTORY_ABI = [
   "function createToken(string memory name, string memory symbol, address merchant) external returns (address)",
+  "event TokenDeployed(address indexed merchant, address tokenAddress, string name, string symbol)",
 ];
 
 const REGISTRY_ABI = [
@@ -35,11 +36,14 @@ try {
 try {
   provider = new ethers.JsonRpcProvider(process.env.RPC_URL || "http://127.0.0.1:8545", null, { staticNetwork: true });
   wallet = new ethers.Wallet(process.env.PRIVATE_KEY || ethers.ZeroHash, provider);
-  provider.ready.then(() => { providerReady = true; }).catch(() => {});
-} catch {}
+  providerReady = true;
+} catch (e) {
+  console.error("Blockchain provider init failed:", e.message);
+}
 
 function mockTx() {
-  return { hash: "0x" + Date.now().toString(16).padStart(64, "0"), mock: true };
+  const short = Date.now().toString(16).padStart(40, "0").slice(-40);
+  return { hash: "0x" + short, mock: true };
 }
 
 async function deployTokenForMerchant(merchantAddr, name, symbol) {
@@ -48,8 +52,13 @@ async function deployTokenForMerchant(merchantAddr, name, symbol) {
     const factory = new ethers.Contract(addresses.factory, FACTORY_ABI, wallet);
     const tx = await factory.createToken(name, symbol, merchantAddr);
     const receipt = await tx.wait();
-    const event = receipt.logs.find(l => l.eventName === "TokenDeployed");
-    return event?.args?.tokenAddress || mockTx().hash;
+    const tokenDeployedTopic = ethers.id("TokenDeployed(address,address,string,string)");
+    const eventLog = receipt.logs.find(l => l.topics?.[0] === tokenDeployedTopic);
+    if (eventLog) {
+      const parsed = factory.interface.parseLog({ topics: eventLog.topics, data: eventLog.data });
+      return parsed?.args?.tokenAddress || mockTx().hash;
+    }
+    return mockTx().hash;
   } catch { return mockTx().hash; }
 }
 
@@ -79,8 +88,11 @@ async function burnFromCustomer(tokenAddr, account, amount) {
 
 async function getBalance(tokenAddr, address) {
   if (!provider || !providerReady) return "0";
-  const token = new ethers.Contract(tokenAddr, TOKEN_ABI, provider);
-  return (await token.balanceOf(address)).toString();
+  if (!ethers.isAddress(tokenAddr) || !ethers.isAddress(address)) return "0";
+  try {
+    const token = new ethers.Contract(tokenAddr, TOKEN_ABI, provider);
+    return (await token.balanceOf(address)).toString();
+  } catch { return "0"; }
 }
 
 async function storeDataHash(userAddress, hash) {
@@ -117,9 +129,31 @@ async function getKycHash(merchantAddress) {
   } catch { return null; }
 }
 
+const CHAIN_EXPLORERS = {
+  1: "https://etherscan.io",
+  11155111: "https://sepolia.etherscan.io",
+  31337: null, // local — no explorer
+};
+
+let cachedChainId = null;
+
+async function getChainId() {
+  if (cachedChainId !== null) return cachedChainId;
+  try {
+    const network = await provider.getNetwork();
+    cachedChainId = Number(network.chainId);
+    return cachedChainId;
+  } catch { return null; }
+}
+
+async function getExplorerUrl() {
+  const chainId = await getChainId();
+  return CHAIN_EXPLORERS[chainId] || null;
+}
+
 module.exports = {
   deployTokenForMerchant, addMerchantToRegistry,
   mintTokens, burnTokens, burnFromCustomer, getBalance,
   storeDataHash, getDataHash, storeKycHash, getKycHash,
-  providerReady,
+  providerReady, getChainId, getExplorerUrl,
 };

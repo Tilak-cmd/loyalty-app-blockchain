@@ -44,6 +44,7 @@ model Merchant {
 
   transactions    Transaction[]
   pendingAwards   PendingAward[]
+  products        Product[]
 }
 
 model Customer {
@@ -105,4 +106,17 @@ model Transaction {
   customerId    String?
   customer      Customer? @relation(fields: [customerId], references: [id])
   createdAt     DateTime @default(now())
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  name        String
+  description String?
+  imageUrl    String?
+  tokenPrice  BigInt   @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

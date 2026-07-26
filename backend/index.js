@@ -24,11 +24,13 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/points", require("./routes/points"));
 app.use("/api/merchant", require("./routes/merchant"));
+app.use("/api/merchant/products", require("./routes/products"));
 app.use("/api/transactions", require("./routes/transactions"));
 app.use("/api/qr", require("./routes/qr"));
 app.use("/api/swap", require("./routes/swap"));
 app.use("/api/analytics", require("./routes/analytics"));
 app.use("/api/merchants", require("./routes/merchants"));
+app.use("/api/blockchain", require("./routes/blockchain"));
 
 if (process.env.NODE_ENV !== "production") {
   app.post("/api/test/reset", async (req, res) => {

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { AuthProvider } from "./contexts/AuthContext";
+import { BlockchainProvider } from "./contexts/BlockchainContext";
 import App from "./App";
 import "./index.css";
 
@@ -17,7 +18,9 @@ createRoot(document.getElementById("root")).render(
     >
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <BlockchainProvider>
+            <App />
+          </BlockchainProvider>
         </AuthProvider>
       </BrowserRouter>
     </PrivyProvider>

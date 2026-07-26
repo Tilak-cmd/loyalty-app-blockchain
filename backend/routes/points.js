@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const prisma = require("../services/prisma");
 const auth = require("../middleware/auth");
-const { getBalance, providerReady } = require("../services/blockchain");
+const { getBalance, burnFromCustomer, providerReady } = require("../services/blockchain");
 
 router.get("/balance/:email", async (req, res) => {
   const customer = await prisma.customer.findUnique({ where: { email: req.params.email } });
@@ -100,6 +100,71 @@ router.get("/transactions", auth, async (req, res) => {
     take: 50,
   });
   res.json({ transactions: txs });
+});
+
+// Customer redeems points for a merchant's product
+router.post("/redeem", auth, async (req, res) => {
+  if (!req.customer) return res.status(403).json({ error: "Customer only" });
+  const { merchantId, productId } = req.body;
+  if (!merchantId || !productId) return res.status(400).json({ error: "Merchant and product required" });
+
+  const merchant = await prisma.merchant.findUnique({ where: { id: merchantId } });
+  if (!merchant || merchant.kybStatus !== "APPROVED") return res.status(404).json({ error: "Merchant not found" });
+  if (!merchant.tokenContract) return res.status(400).json({ error: "Merchant has no token contract" });
+  if (!req.customer.walletAddress) return res.status(400).json({ error: "Customer has no wallet address. Contact support." });
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product || product.merchantId !== merchantId || !product.isActive) {
+    return res.status(404).json({ error: "Product not found" });
+  }
+
+  const cost = BigInt(product.tokenPrice);
+  const dbBalance = BigInt(req.customer.pointsBalance);
+
+  if (dbBalance < cost) return res.status(400).json({ error: "Insufficient points" });
+
+  // Check on-chain balance if available
+  let onChainAvailable = true;
+  if (providerReady && merchant.tokenContract && req.customer.walletAddress) {
+    try {
+      const onChain = BigInt(await getBalance(merchant.tokenContract, req.customer.walletAddress));
+      if (onChain < cost) onChainAvailable = false;
+    } catch { onChainAvailable = false; }
+  }
+
+  let txHash;
+  try {
+    const receipt = await burnFromCustomer(merchant.tokenContract, req.customer.walletAddress, cost);
+    txHash = receipt.hash;
+  } catch (e) {
+    if (!onChainAvailable) {
+      return res.status(400).json({ error: "Insufficient on-chain balance. Please sync your account." });
+    }
+    console.warn("On-chain burn failed (mock mode):", e.message);
+    txHash = "REDEEM:" + Date.now() + ":" + req.customer.id + ":" + productId;
+  }
+
+  // Deduct from customer
+  await prisma.customer.update({
+    where: { id: req.customer.id },
+    data: { pointsBalance: dbBalance - cost },
+  });
+
+  // Create transaction
+  const tx = await prisma.transaction.create({
+    data: {
+      txHash,
+      type: "REDEEM",
+      fromAddress: req.customer.walletAddress || "customer",
+      toAddress: merchant.walletAddress || merchant.id,
+      amount: cost.toString(),
+      tokenContract: merchant.tokenContract,
+      merchantId: merchant.id,
+      customerId: req.customer.id,
+    },
+  });
+
+  res.json({ success: true, tx, product: { id: product.id, name: product.name } });
 });
 
 module.exports = router;

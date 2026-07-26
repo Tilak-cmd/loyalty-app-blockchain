@@ -70,8 +70,10 @@ router.post("/award", auth, requireMerchant, async (req, res) => {
       await burnFromCustomer(merchant.tokenContract, merchant.walletAddress, BigInt(amount));
       onChainTx = await mintTokens(merchant.tokenContract, customer.walletAddress, BigInt(amount));
     } catch (e) {
-      console.warn("On-chain award failed:", e.message);
+      return res.status(500).json({ error: "On-chain award failed — DB not updated. " + e.message });
     }
+  } else if (providerReady && customer.walletAddress && (!merchant.tokenContract || !merchant.walletAddress)) {
+    return res.status(400).json({ error: "Merchant has no token contract. Contact support." });
   }
 
   await prisma.merchant.update({
@@ -84,13 +86,15 @@ router.post("/award", auth, requireMerchant, async (req, res) => {
     data: { pointsBalance: { increment: BigInt(amount) } },
   });
 
+  const txHash = onChainTx?.hash || "AWARD:" + Date.now() + ":" + merchant.id + ":" + customer.id;
   await prisma.transaction.create({
     data: {
-      txHash: "AWARD:" + Date.now() + ":" + merchant.id + ":" + customer.id,
+      txHash,
       type: "AWARD",
-      fromAddress: merchant.email,
-      toAddress: customerEmail,
+      fromAddress: onChainTx?.hash?.startsWith?.("0x") ? merchant.walletAddress : merchant.email,
+      toAddress: onChainTx?.hash?.startsWith?.("0x") ? customer.walletAddress : customerEmail,
       amount: amount.toString(),
+      tokenContract: merchant.tokenContract,
       merchantId: merchant.id,
       customerId: customer.id,
     },
@@ -196,17 +200,6 @@ router.post("/checkout-success", auth, requireMerchant, async (req, res) => {
       data: { tokenBalance: { increment: BigInt(netTokens) } },
     });
 
-    await prisma.transaction.create({
-      data: {
-        txHash: "TOPUP:" + sessionId,
-        type: "TOPUP",
-        fromAddress: "stripe",
-        toAddress: req.merchant.email,
-        amount: netTokens.toString(),
-        merchantId,
-      },
-    });
-
     // On-chain: mint ERC20 tokens to merchant wallet
     let onChainTx = null;
     if (providerReady && updated.tokenContract && updated.walletAddress) {
@@ -216,6 +209,19 @@ router.post("/checkout-success", auth, requireMerchant, async (req, res) => {
         console.warn("On-chain mint failed:", e.message);
       }
     }
+
+    const txHash = onChainTx?.hash || "TOPUP:" + sessionId;
+    await prisma.transaction.create({
+      data: {
+        txHash,
+        type: "TOPUP",
+        fromAddress: onChainTx?.hash?.startsWith?.("0x") ? "stripe:" + updated.walletAddress : "stripe",
+        toAddress: updated.email,
+        amount: netTokens.toString(),
+        tokenContract: updated.tokenContract,
+        merchantId,
+      },
+    });
 
     res.json({ success: true, amountNPR, grossTokens, fee, netTokens, merchant: updated, onChainTx });
   } catch (err) {
@@ -244,17 +250,6 @@ router.post("/topup", auth, async (req, res) => {
     data: { tokenBalance: { increment: BigInt(netTokens) } },
   });
 
-  await prisma.transaction.create({
-    data: {
-      txHash: "TOPUP:" + Date.now() + ":" + merchant.id,
-      type: "TOPUP",
-      fromAddress: req.user?.isAdmin ? "admin" : "stripe",
-      toAddress: merchant.email,
-      amount: netTokens.toString(),
-      merchantId: merchant.id,
-    },
-  });
-
   // On-chain: mint ERC20 tokens to merchant wallet
   let onChainTx = null;
   if (providerReady && updated.tokenContract && updated.walletAddress) {
@@ -264,6 +259,19 @@ router.post("/topup", auth, async (req, res) => {
       console.warn("On-chain mint failed:", e.message);
     }
   }
+
+  const txHash = onChainTx?.hash || "TOPUP:" + Date.now() + ":" + merchant.id;
+  await prisma.transaction.create({
+    data: {
+      txHash,
+      type: "TOPUP",
+      fromAddress: onChainTx?.hash?.startsWith?.("0x") ? (req.user?.isAdmin ? "admin:" + updated.walletAddress : "stripe:" + updated.walletAddress) : (req.user?.isAdmin ? "admin" : "stripe"),
+      toAddress: updated.email,
+      amount: netTokens.toString(),
+      tokenContract: updated.tokenContract,
+      merchantId: merchant.id,
+    },
+  });
 
   res.json({ success: true, amountNPR: +amountNPR, grossTokens, fee, netTokens, merchant: updated, onChainTx });
 });
