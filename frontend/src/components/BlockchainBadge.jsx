@@ -1,6 +1,5 @@
 import { CheckCircle, AlertTriangle, WifiOff, ExternalLink } from "lucide-react";
-
-const SEPOLIA_EXPLORER = "https://sepolia.etherscan.io";
+import { useBlockchain } from "../contexts/BlockchainContext";
 
 export function OnChainBadge({ match, onChainBalance, tokenContract }) {
   if (onChainBalance === null || onChainBalance === undefined) {
@@ -24,10 +23,18 @@ export function OnChainBadge({ match, onChainBalance, tokenContract }) {
   );
 }
 
+function useExplorerUrl() {
+  let url = "https://sepolia.etherscan.io";
+  try { const ctx = useBlockchain(); if (ctx.explorerUrl) url = ctx.explorerUrl; } catch {}
+  return url;
+}
+
 export function ContractLink({ address, label }) {
   if (!address || !address.startsWith("0x")) return null;
+  const explorerUrl = useExplorerUrl();
+  if (!explorerUrl) return <span className="text-xs text-gray-400 font-mono">{address.slice(0, 6)}...{address.slice(-4)} <span className="text-gray-300">(local)</span></span>;
   return (
-    <a href={`${SEPOLIA_EXPLORER}/address/${address}`} target="_blank" rel="noopener noreferrer"
+    <a href={`${explorerUrl}/address/${address}`} target="_blank" rel="noopener noreferrer"
       className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-mono">
       {label || address.slice(0, 6) + "..." + address.slice(-4)} <ExternalLink className="w-3 h-3" />
     </a>
@@ -37,8 +44,10 @@ export function ContractLink({ address, label }) {
 export function TxLink({ hash }) {
   if (!hash || typeof hash !== "string") return null;
   if (!hash.startsWith("0x")) return <span className="text-xs text-gray-400 font-mono">{hash}</span>;
+  const explorerUrl = useExplorerUrl();
+  if (!explorerUrl) return <span className="text-xs text-gray-400 font-mono">{hash.slice(0, 10)}...{hash.slice(-6)} <span className="text-gray-300">(local)</span></span>;
   return (
-    <a href={`${SEPOLIA_EXPLORER}/tx/${hash}`} target="_blank" rel="noopener noreferrer"
+    <a href={`${explorerUrl}/tx/${hash}`} target="_blank" rel="noopener noreferrer"
       className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-mono">
       {hash.slice(0, 10)}...{hash.slice(-6)} <ExternalLink className="w-3 h-3" />
     </a>
@@ -57,6 +66,7 @@ export function AddressDisplay({ address, label }) {
 
 export function BlockchainInfo({ tokenContract, walletAddress, onChainBalance, onChainMatch }) {
   const connected = onChainBalance !== null && onChainBalance !== undefined;
+  const needsWallet = !walletAddress && !tokenContract;
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5">
       <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1">
@@ -64,8 +74,11 @@ export function BlockchainInfo({ tokenContract, walletAddress, onChainBalance, o
         Blockchain
         <OnChainBadge match={onChainMatch} onChainBalance={onChainBalance} />
       </div>
-      {!connected && (
-        <p className="text-xs text-gray-400">Blockchain provider not connected — balances are database-only.</p>
+      {!connected && needsWallet && (
+        <p className="text-xs text-amber-600">No wallet linked — on-chain balance unavailable.</p>
+      )}
+      {!connected && !needsWallet && (
+        <p className="text-xs text-gray-400">Blockchain provider offline — balances are database-only.</p>
       )}
       {tokenContract && <div className="flex items-center gap-1 text-xs"><span className="text-gray-500">Token:</span> <ContractLink address={tokenContract} /></div>}
       {walletAddress && <AddressDisplay address={walletAddress} label="Wallet" />}

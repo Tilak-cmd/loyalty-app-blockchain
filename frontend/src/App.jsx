@@ -7,6 +7,8 @@ import AdminLogin from "./pages/AdminLogin";
 import MerchantDashboard from "./pages/MerchantDashboard";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import CustomerProfile from "./pages/CustomerProfile";
+import CustomerRedeem from "./pages/CustomerRedeem";
+import MerchantProducts from "./pages/MerchantProducts";
 import AdminPanel from "./pages/AdminPanel";
 import SidebarLayout from "./components/SidebarLayout";
 
@@ -26,8 +28,10 @@ export default function App() {
       <Route path="/admin/login" element={user?.isAdmin ? <Navigate to="/admin" /> : <AdminLogin />} />
       <Route path="/dashboard" element={<AppShell><DashboardContent /></AppShell>} />
       <Route path="/merchant/dashboard" element={merchant ? <AppShell><MerchantDashboard /></AppShell> : <Navigate to="/merchant/login" />} />
+      <Route path="/merchant/products" element={merchant ? <AppShell><MerchantProducts /></AppShell> : <Navigate to="/merchant/login" />} />
       <Route path="/customer/dashboard" element={customer ? <AppShell><CustomerDashboard /></AppShell> : <Navigate to="/customer/auth" />} />
       <Route path="/customer/profile" element={customer ? <AppShell><CustomerProfile /></AppShell> : <Navigate to="/customer/auth" />} />
+      <Route path="/customer/redeem" element={customer ? <AppShell><CustomerRedeem /></AppShell> : <Navigate to="/customer/auth" />} />
       <Route path="/admin" element={user?.isAdmin ? <AppShell><AdminPanel /></AppShell> : <Navigate to="/admin/login" />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

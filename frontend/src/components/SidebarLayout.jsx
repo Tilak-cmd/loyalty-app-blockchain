@@ -4,7 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useAuth } from "../contexts/AuthContext";
 import { cn } from "../lib/utils";
 import {
-  LayoutDashboard, Store, Shield, Menu, X, LogOut, Building, User, BadgeCheck, Clock, Gift, Settings,
+  LayoutDashboard, Store, Shield, Menu, X, LogOut, Building, User, BadgeCheck, Clock, Gift, Settings, Package,
 } from "lucide-react";
 
 export default function SidebarLayout({ children }) {
@@ -22,12 +22,14 @@ export default function SidebarLayout({ children }) {
   }
 
   if (merchant) {
-    navItems.push({ to: "/merchant/dashboard", label: "Merchant Dashboard", icon: Store });
+    navItems.push({ to: "/merchant/dashboard", label: "Dashboard", icon: Store });
+    navItems.push({ to: "/merchant/products", label: "Products", icon: Package });
   }
 
   if (customer) {
     navItems.push({ to: "/customer/dashboard", label: "Dashboard", icon: LayoutDashboard });
     navItems.push({ to: "/customer/profile", label: "My Profile", icon: User });
+    navItems.push({ to: "/customer/redeem", label: "Redeem", icon: Gift });
   }
 
   if (!user && !merchant && !customer) {

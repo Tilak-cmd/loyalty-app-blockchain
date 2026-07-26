@@ -5,12 +5,14 @@ import { Input, Label } from "../components/ui/input";
 import { Badge } from "../components/ui/table";
 import { useAuth } from "../contexts/AuthContext";
 import { merchantApi, points } from "../services/endpoints";
-import { Store, Award, Gift, Coins, TrendingUp, Users, CheckCircle, AlertCircle, Clock, DollarSign, CreditCard, XCircle, Loader, RefreshCw, Mail, Shield } from "lucide-react";
+import { Store, Award, Gift, Coins, TrendingUp, Users, CheckCircle, AlertCircle, Clock, DollarSign, CreditCard, XCircle, Loader, RefreshCw, Mail, Shield, Package } from "lucide-react";
 import { OnChainBadge, BlockchainInfo, TxLink } from "../components/BlockchainBadge";
+import MerchantProducts from "./MerchantProducts";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: TrendingUp },
   { key: "award", label: "Award Points", icon: Award },
+  { key: "products", label: "Products", icon: Gift },
   { key: "customers", label: "Customers", icon: Users },
   { key: "topup", label: "Buy Tokens", icon: Coins },
 ];
@@ -121,6 +123,7 @@ export default function MerchantDashboard() {
 
           {tab === "overview" && <OverviewTab merchantData={merchantData} onChainBalance={onChainBalance} onChainMatch={onChainMatch} load={load} />}
           {tab === "award" && <AwardTab merchantData={merchantData} onChainBalance={onChainBalance} load={load} />}
+          {tab === "products" && <ProductsTab />}
           {tab === "customers" && <CustomersTab />}
           {tab === "topup" && <TopUpTab merchantData={merchantData} load={load} />}
         </>
@@ -243,19 +246,9 @@ function AwardTab({ merchantData, onChainBalance, load }) {
             <Input type="email" placeholder="customer@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="pl-10" />
           </div>
           {customerInfo && (
-            <div className="mt-1 space-y-0.5">
-              <p className="text-xs text-gray-500">
-                {customerInfo.found ? `Existing customer • Balance: ${parseInt(customerInfo.balance).toLocaleString()} pts` : "New customer (will be created)"}
-              </p>
-              {customerInfo.found && (
-                <div className="flex items-center gap-1.5">
-                  <OnChainBadge match={customerInfo.match} onChainBalance={customerInfo.onChainBalance} />
-                  {customerInfo.onChainBalance !== null && customerInfo.onChainBalance !== undefined && (
-                    <span className="text-xs text-gray-400">on-chain: {BigInt(customerInfo.onChainBalance).toLocaleString()}</span>
-                  )}
-                </div>
-              )}
-            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              {customerInfo.found ? "Existing customer" : "New customer (will be created)"}
+            </p>
           )}
         </div>
         <div>
@@ -331,6 +324,10 @@ function CustomersTab() {
       </CardContent>
     </Card>
   );
+}
+
+function ProductsTab() {
+  return <MerchantProducts />;
 }
 
 function TopUpTab({ merchantData, load }) {
