@@ -5,7 +5,8 @@ import { Input, Label } from "../components/ui/input";
 import { Badge } from "../components/ui/table";
 import { useAuth } from "../contexts/AuthContext";
 import { merchantApi, points } from "../services/endpoints";
-import { Store, Award, Gift, Coins, TrendingUp, Users, CheckCircle, AlertCircle, Clock, DollarSign, CreditCard, Wallet, Landmark, XCircle, Loader, RefreshCw, Mail } from "lucide-react";
+import { Store, Award, Gift, Coins, TrendingUp, Users, CheckCircle, AlertCircle, Clock, DollarSign, CreditCard, XCircle, Loader, RefreshCw, Mail, Shield } from "lucide-react";
+import { OnChainBadge, BlockchainInfo, TxLink } from "../components/BlockchainBadge";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: TrendingUp },
@@ -18,6 +19,8 @@ export default function MerchantDashboard() {
   const { merchant } = useAuth();
   const [tab, setTab] = useState("overview");
   const [merchantData, setMerchantData] = useState(null);
+  const [onChainBalance, setOnChainBalance] = useState(null);
+  const [onChainMatch, setOnChainMatch] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [processingPayment, setProcessingPayment] = useState(false);
@@ -39,6 +42,8 @@ export default function MerchantDashboard() {
     try {
       const r = await merchantApi.status();
       setMerchantData(r.data.merchant);
+      setOnChainBalance(r.data.onChainBalance ?? null);
+      setOnChainMatch(r.data.onChainMatch ?? null);
     } catch {}
   };
 
@@ -114,8 +119,8 @@ export default function MerchantDashboard() {
             ))}
           </div>
 
-          {tab === "overview" && <OverviewTab merchantData={merchantData} load={load} />}
-          {tab === "award" && <AwardTab merchantData={merchantData} load={load} />}
+          {tab === "overview" && <OverviewTab merchantData={merchantData} onChainBalance={onChainBalance} onChainMatch={onChainMatch} load={load} />}
+          {tab === "award" && <AwardTab merchantData={merchantData} onChainBalance={onChainBalance} load={load} />}
           {tab === "customers" && <CustomersTab />}
           {tab === "topup" && <TopUpTab merchantData={merchantData} load={load} />}
         </>
@@ -124,16 +129,27 @@ export default function MerchantDashboard() {
   );
 }
 
-function OverviewTab({ merchantData, load }) {
+function OverviewTab({ merchantData, onChainBalance, onChainMatch, load }) {
+  const tokenContract = merchantData?.tokenContract;
+  const walletAddress = merchantData?.walletAddress;
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-green-50 border-green-200">
-          <CardContent className="pt-4 flex items-center gap-3">
-            <Coins className="w-8 h-8 text-green-500" />
-            <div>
-              <p className="text-xs text-gray-500">Token Balance</p>
-              <p className="text-lg font-bold">{parseInt(merchantData?.tokenBalance || "0").toLocaleString()}</p>
+          <CardContent className="pt-4 space-y-1">
+            <div className="flex items-center gap-3">
+              <Coins className="w-8 h-8 text-green-500 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-gray-500">Token Balance</p>
+                <p className="text-lg font-bold">{parseInt(merchantData?.tokenBalance || "0").toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 pt-1">
+              <OnChainBadge match={onChainMatch} onChainBalance={onChainBalance} />
+              {onChainBalance !== null && onChainBalance !== undefined && (
+                <span className="text-xs text-gray-400">on-chain: {BigInt(onChainBalance).toLocaleString()}</span>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -157,24 +173,38 @@ function OverviewTab({ merchantData, load }) {
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="pt-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold text-lg">{merchantData?.businessName}</p>
-            <Badge variant="success">Approved</Badge>
-          </div>
-          <p className="text-sm text-gray-500">{merchantData?.email}</p>
-          {merchantData?.phone && <p className="text-sm text-gray-500">{merchantData.phone}</p>}
-          {merchantData?.country && <p className="text-sm text-gray-500">{merchantData.country} ({merchantData.currency})</p>}
-          {merchantData?.website && <p className="text-sm text-blue-600">{merchantData.website}</p>}
-          <p className="text-sm text-gray-400">Plan: {merchantData?.plan}</p>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-lg">{merchantData?.businessName}</p>
+              <Badge variant="success">Approved</Badge>
+            </div>
+            <p className="text-sm text-gray-500">{merchantData?.email}</p>
+            {merchantData?.phone && <p className="text-sm text-gray-500">{merchantData.phone}</p>}
+            {merchantData?.country && <p className="text-sm text-gray-500">{merchantData.country} ({merchantData.currency})</p>}
+            {merchantData?.website && <p className="text-sm text-blue-600">{merchantData.website}</p>}
+            <p className="text-sm text-gray-400">Plan: {merchantData?.plan}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex items-center gap-2"><Shield className="w-4 h-4" /><CardTitle>Blockchain</CardTitle></CardHeader>
+          <CardContent>
+            <BlockchainInfo
+              tokenContract={tokenContract}
+              walletAddress={walletAddress}
+              onChainBalance={onChainBalance}
+              onChainMatch={onChainMatch}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function AwardTab({ merchantData, load }) {
+function AwardTab({ merchantData, onChainBalance, load }) {
   const [customerEmail, setCustomerEmail] = useState("");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
@@ -213,17 +243,36 @@ function AwardTab({ merchantData, load }) {
             <Input type="email" placeholder="customer@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="pl-10" />
           </div>
           {customerInfo && (
-            <p className="text-xs mt-1 text-gray-500">
-              {customerInfo.found ? `Existing customer • Balance: ${parseInt(customerInfo.balance).toLocaleString()} pts` : "New customer (will be created)"}
-            </p>
+            <div className="mt-1 space-y-0.5">
+              <p className="text-xs text-gray-500">
+                {customerInfo.found ? `Existing customer • Balance: ${parseInt(customerInfo.balance).toLocaleString()} pts` : "New customer (will be created)"}
+              </p>
+              {customerInfo.found && (
+                <div className="flex items-center gap-1.5">
+                  <OnChainBadge match={customerInfo.match} onChainBalance={customerInfo.onChainBalance} />
+                  {customerInfo.onChainBalance !== null && customerInfo.onChainBalance !== undefined && (
+                    <span className="text-xs text-gray-400">on-chain: {BigInt(customerInfo.onChainBalance).toLocaleString()}</span>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
         <div>
           <Label>Points to Award</Label>
           <Input type="number" placeholder="100" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </div>
-        <div className="text-xs text-gray-500">
-          Your balance: <strong>{parseInt(merchantData?.tokenBalance || "0").toLocaleString()}</strong> tokens
+        <div className="text-xs text-gray-500 space-y-0.5">
+          <p>Your balance: <strong>{parseInt(merchantData?.tokenBalance || "0").toLocaleString()}</strong> tokens</p>
+          {merchantData?.tokenContract && (
+            <p className="flex items-center gap-1">
+              Contract:{" "}
+              <a href={`https://sepolia.etherscan.io/address/${merchantData.tokenContract}`} target="_blank" rel="noopener noreferrer"
+                className="text-blue-600 hover:underline font-mono">
+                {merchantData.tokenContract.slice(0, 6)}...{merchantData.tokenContract.slice(-4)}
+              </a>
+            </p>
+          )}
         </div>
         <Button className="w-full" onClick={awardPoints} disabled={loading}>
           <Award className="w-4 h-4 mr-1" />{loading ? "Awarding..." : "Award Points"}
@@ -296,8 +345,7 @@ function TopUpTab({ merchantData, load }) {
     try {
       const r = await merchantApi.createCheckoutSession({ amountNPR: +amountNPR });
       window.location.href = r.data.url;
-    } catch (e) { setError(e.response?.data?.error || "Failed to create checkout session"); }
-    setLoading(false);
+    } catch (e) { setError(e.response?.data?.error || "Failed to create checkout session"); setLoading(false); }
   };
 
   return (
@@ -310,13 +358,13 @@ function TopUpTab({ merchantData, load }) {
           <Label>Amount (NPR)</Label>
           <div className="relative mt-1">
             <DollarSign className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-            <Input type="number" placeholder="1000" value={amountNPR} onChange={(e) => setAmountNPR(e.target.value)} className="pl-10" />
+            <Input type="number" min="1" placeholder="1000" value={amountNPR} onChange={(e) => { setAmountNPR(e.target.value); setError(""); }} className="pl-10" disabled={loading} />
           </div>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 space-y-1">
           <p><strong>Exchange Rate:</strong> 1 NPR = {(merchantData?.exchangeRate || 100) / 100} pts</p>
           <p><strong>Platform Fee:</strong> {merchantData?.feeRate || 5}%</p>
-          <p><strong>You Get:</strong> ~{Math.floor((parseInt(amountNPR || "0") * (merchantData?.exchangeRate || 100) / 100) * (100 - (merchantData?.feeRate || 5)) / 100).toLocaleString()} tokens</p>
+          <p><strong>You Get:</strong> ~{Math.floor((parseFloat(amountNPR || "0") * (merchantData?.exchangeRate || 100) / 100) * (100 - (merchantData?.feeRate || 5)) / 100).toLocaleString()} tokens</p>
         </div>
         <Button className="w-full" onClick={buyTokens} disabled={loading}>
           <CreditCard className="w-4 h-4 mr-1" />{loading ? "Redirecting to Stripe..." : "Pay with Card"}

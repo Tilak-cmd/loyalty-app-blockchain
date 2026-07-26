@@ -6,6 +6,7 @@ const Ctx = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [merchant, setMerchant] = useState(null);
+  const [customer, setCustomer] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -20,8 +21,14 @@ export function AuthProvider({ children }) {
           setMerchant(r.data.merchant);
           setLoading(false);
         }).catch(() => { logout(); setLoading(false); });
+      } else if (savedType === "customer") {
+        api.get("/points/me").then((r) => {
+          setCustomer(r.data.customer);
+          setLoading(false);
+        }).catch(() => { logout(); setLoading(false); });
       } else {
-        api.get("/points/me").then(() => {
+        api.get("/points/me").then((r) => {
+          if (r.data.type === "user") setUser(r.data.user);
           setLoading(false);
         }).catch(() => { logout(); setLoading(false); });
       }
@@ -35,13 +42,12 @@ export function AuthProvider({ children }) {
     localStorage.setItem("loyalchain_type", type);
     api.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     setToken(newToken);
-    if (type === "merchant") {
-      setMerchant(data);
-      setUser(null);
-    } else {
-      setUser(data);
-      setMerchant(null);
-    }
+    setUser(null);
+    setMerchant(null);
+    setCustomer(null);
+    if (type === "merchant") setMerchant(data);
+    else if (type === "customer") setCustomer(data);
+    else setUser(data);
   };
 
   const logout = () => {
@@ -51,6 +57,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     setMerchant(null);
+    setCustomer(null);
   };
 
   const isAdmin = user?.isAdmin;
@@ -58,7 +65,7 @@ export function AuthProvider({ children }) {
   const isPendingMerchant = merchant?.kybStatus === "PENDING";
 
   return (
-    <Ctx.Provider value={{ user, merchant, token, loading, login, logout, isAdmin, isMerchant, isPendingMerchant }}>
+    <Ctx.Provider value={{ user, merchant, customer, token, loading, login, logout, isAdmin, isMerchant, isPendingMerchant }}>
       {children}
     </Ctx.Provider>
   );

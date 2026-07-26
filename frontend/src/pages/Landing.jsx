@@ -28,6 +28,7 @@ export default function Landing() {
               <Link to="/dashboard"><Button size="sm">Dashboard</Button></Link>
             ) : (
               <>
+                <Link to="/customer/auth"><Button variant="outline" size="sm">Customer Login</Button></Link>
                 <Link to="/merchant/login"><Button variant="outline" size="sm">Merchant Login</Button></Link>
                 <Link to="/admin/login"><Button size="sm">Admin Login</Button></Link>
               </>
@@ -50,8 +51,8 @@ export default function Landing() {
             <Link to="/dashboard"><Button size="lg" className="px-8">Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" /></Button></Link>
           ) : (
             <>
-              <Link to="/register"><Button size="lg" className="px-8">Get Started Free <ArrowRight className="w-4 h-4 ml-1" /></Button></Link>
-              <Link to="/login"><Button variant="outline" size="lg" className="px-8">Sign In</Button></Link>
+              <Link to="/customer/auth"><Button size="lg" className="px-8">Get Started Free <ArrowRight className="w-4 h-4 ml-1" /></Button></Link>
+              <Link to="/customer/auth"><Button variant="outline" size="lg" className="px-8">Sign In</Button></Link>
             </>
           )}
         </div>

@@ -4,11 +4,11 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useAuth } from "../contexts/AuthContext";
 import { cn } from "../lib/utils";
 import {
-  LayoutDashboard, Store, Shield, Menu, X, LogOut, Building, User, BadgeCheck, Clock,
+  LayoutDashboard, Store, Shield, Menu, X, LogOut, Building, User, BadgeCheck, Clock, Gift, Settings,
 } from "lucide-react";
 
 export default function SidebarLayout({ children }) {
-  const { user, merchant, logout: appLogout, isAdmin, isMerchant, isPendingMerchant } = useAuth();
+  const { user, merchant, customer, logout: appLogout, isAdmin, isMerchant, isPendingMerchant } = useAuth();
   const { logout: privyLogout, ready } = usePrivy();
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,7 +25,12 @@ export default function SidebarLayout({ children }) {
     navItems.push({ to: "/merchant/dashboard", label: "Merchant Dashboard", icon: Store });
   }
 
-  if (!user && !merchant) {
+  if (customer) {
+    navItems.push({ to: "/customer/dashboard", label: "Dashboard", icon: LayoutDashboard });
+    navItems.push({ to: "/customer/profile", label: "My Profile", icon: User });
+  }
+
+  if (!user && !merchant && !customer) {
     navItems.push({ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard });
   }
 
@@ -42,10 +47,11 @@ export default function SidebarLayout({ children }) {
     if (isAdmin) return { label: "Admin", color: "bg-purple-100 text-purple-800" };
     if (isPendingMerchant) return { label: "Pending Merchant", color: "bg-yellow-100 text-yellow-800" };
     if (isMerchant) return { label: "Merchant", color: "bg-green-100 text-green-800" };
+    if (customer) return { label: "Customer", color: "bg-blue-100 text-blue-800" };
     return { label: "User", color: "bg-blue-100 text-blue-800" };
   };
   const badge = roleBadge();
-  const displayEmail = user?.email || merchant?.email || "";
+  const displayEmail = user?.email || merchant?.email || customer?.email || "";
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

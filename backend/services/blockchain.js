@@ -121,4 +121,5 @@ module.exports = {
   deployTokenForMerchant, addMerchantToRegistry,
   mintTokens, burnTokens, burnFromCustomer, getBalance,
   storeDataHash, getDataHash, storeKycHash, getKycHash,
+  providerReady,
 };

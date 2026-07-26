@@ -93,7 +93,17 @@ router.post("/merchants/:id/topup", auth, requireAdmin, async (req, res) => {
     },
   });
 
-  res.json({ success: true, netTokens, fee, amountNPR: +amountNPR, merchant: updated });
+  // On-chain: mint ERC20 tokens to merchant wallet
+  let onChainTx = null;
+  if (blockchain.providerReady && updated.tokenContract && updated.walletAddress) {
+    try {
+      onChainTx = await blockchain.mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
+    } catch (e) {
+      console.warn("On-chain mint failed:", e.message);
+    }
+  }
+
+  res.json({ success: true, netTokens, fee, amountNPR: +amountNPR, merchant: updated, onChainTx });
 });
 
 // Get stats
