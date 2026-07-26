@@ -10,15 +10,13 @@ import { Store, Upload, CheckCircle, AlertCircle, LogIn, Building, Loader, Mail 
 
 export default function MerchantAuth() {
   const { login: appLogin, merchant } = useAuth();
-  const { login: privyLogin, authenticated, user: privyUser, getAccessToken, ready } = usePrivy();
+  const { login: privyLogin, logout: privyLogout, authenticated, user: privyUser, getAccessToken, ready } = usePrivy();
   const navigate = useNavigate();
   const logoRef = useRef(null);
-  const authingRef = useRef(false);
 
   const [mode, setMode] = useState("register");
   const [businessName, setBusinessName] = useState("");
   const [legalName, setLegalName] = useState("");
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("");
   const [currency, setCurrency] = useState("NPR");
@@ -27,43 +25,53 @@ export default function MerchantAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [authStep, setAuthStep] = useState(null);
+  const [waitingForAuth, setWaitingForAuth] = useState(false);
 
   useEffect(() => {
     if (merchant) navigate("/merchant/dashboard", { replace: true });
   }, [merchant]);
 
   useEffect(() => {
-    if (!authingRef.current) return;
+    if (!waitingForAuth) return;
     if (!authenticated || !privyUser || !ready) return;
-    authingRef.current = false;
+    setWaitingForAuth(false);
     if (mode === "register") submitRegistration();
     else doLogin();
-  }, [authenticated, privyUser, ready]);
+  }, [authenticated, privyUser, ready, waitingForAuth]);
+
+  useEffect(() => {
+    if (!waitingForAuth) return;
+    const timer = setTimeout(() => {
+      setWaitingForAuth(false);
+      setLoading(false);
+      setError("Authentication timed out. Please make sure you complete the email verification in the popup window.");
+    }, 60000);
+    return () => clearTimeout(timer);
+  }, [waitingForAuth]);
 
   const startAuth = () => {
     if (mode === "register" && !businessName.trim()) { setError("Business name is required"); return; }
     setError("");
-    setAuthStep("auth");
-    authingRef.current = true;
+    setLoading(true);
     if (authenticated && privyUser && ready) {
-      authingRef.current = false;
       if (mode === "register") submitRegistration();
       else doLogin();
     } else {
+      setWaitingForAuth(true);
       privyLogin();
     }
   };
 
   const submitRegistration = async () => {
-    setLoading(true); setError("");
+    setError("");
+    const privyEmail = privyUser?.email?.address;
+    if (!privyEmail) { setError("Could not get email from authentication"); setLoading(false); return; }
     try {
       const token = await getAccessToken();
-      const formEmail = email.trim() || privyUser?.email?.address || "";
       const formData = new FormData();
       formData.append("token", token);
       formData.append("businessName", businessName.trim());
-      formData.append("email", formEmail);
+      formData.append("email", privyEmail);
       if (legalName) formData.append("legalBusinessName", legalName.trim());
       if (phone) formData.append("phone", phone.trim());
       if (country) formData.append("country", country.trim());
@@ -76,20 +84,21 @@ export default function MerchantAuth() {
       setTimeout(() => navigate("/merchant/dashboard"), 1500);
     } catch (e) {
       setError(e.response?.data?.error || "Registration failed");
-      setAuthStep(null);
+      privyLogout();
     }
     setLoading(false);
   };
 
   const doLogin = async () => {
-    setLoading(true); setError("");
+    setError("");
+    const privyEmail = privyUser?.email?.address;
+    if (!privyEmail) { setError("Could not get email from authentication"); setLoading(false); return; }
     try {
       const token = await getAccessToken();
-      const loginEmail = email.trim() || privyUser?.email?.address || "";
-      const r = await merchantApi.login({ token, email: loginEmail });
+      const r = await merchantApi.login({ token, email: privyEmail });
       appLogin(r.data.token, "merchant", r.data.merchant);
       navigate("/merchant/dashboard");
-    } catch (e) { setError(e.response?.data?.error || "Login failed"); }
+    } catch (e) { setError(e.response?.data?.error || "Login failed"); privyLogout(); }
     setLoading(false);
   };
 
@@ -108,13 +117,14 @@ export default function MerchantAuth() {
     );
   }
 
-  if (authStep === "auth") {
+  if (waitingForAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
         <Card className="w-full max-w-sm mx-4">
-          <CardContent className="py-8 text-center">
-            <Loader className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-500">{loading ? "Processing..." : "Authenticating with your email..."}</p>
+          <CardContent className="py-8 text-center space-y-3">
+            <Loader className="w-8 h-8 animate-spin mx-auto text-blue-600" />
+            <p className="text-gray-700 font-medium">Check your email for a verification code...</p>
+            <p className="text-xs text-gray-400">A Privy popup should appear. Complete it to continue.</p>
           </CardContent>
         </Card>
       </div>
@@ -132,18 +142,16 @@ export default function MerchantAuth() {
           </CardHeader>
           <CardContent className="space-y-4">
             {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
-            <div>
-              <Label>Business Email</Label>
-              <div className="relative mt-1">
-                <Mail className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                <Input type="email" placeholder="business@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" />
-              </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center text-sm text-blue-700">
+              <p>Click below to sign in with your business email via Privy.</p>
+              <p className="text-xs mt-1">A one-time code will be sent to your email.</p>
             </div>
             <Button className="w-full" onClick={startAuth} disabled={loading}>
-              <LogIn className="w-4 h-4 mr-2" />{loading ? "Signing in..." : "Continue with Email"}
+              {loading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <LogIn className="w-4 h-4 mr-2" />}
+              {loading ? "Opening Privy..." : "Sign in with Email"}
             </Button>
             <p className="text-xs text-center text-gray-400">
-              Don't have an account? <button onClick={() => setMode("register")} className="text-blue-600 hover:underline">Register here</button>
+              Don't have an account? <button onClick={() => { setMode("register"); setError(""); }} className="text-blue-600 hover:underline">Register here</button>
             </p>
           </CardContent>
         </Card>
@@ -169,14 +177,6 @@ export default function MerchantAuth() {
           <div>
             <Label>Legal Business Name</Label>
             <Input placeholder="Legal name (if different)" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
-          </div>
-          <div>
-            <Label>Business Email *</Label>
-            <div className="relative mt-1">
-              <Mail className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-              <Input type="email" placeholder="business@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" />
-            </div>
-            <p className="text-xs text-gray-400 mt-1">You'll sign in with this email via Privy</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -206,11 +206,18 @@ export default function MerchantAuth() {
               <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
             </div>
           </div>
-          <Button className="w-full" onClick={startAuth} disabled={!businessName.trim()}>
-            <LogIn className="w-4 h-4 mr-2" />Continue with Email
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
+            After clicking Continue, you'll verify your business email via Privy in a popup window.
+          </div>
+          <Button className="w-full" onClick={startAuth} disabled={!businessName.trim() || loading}>
+            {loading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <LogIn className="w-4 h-4 mr-2" />}
+            {loading ? "Opening Privy..." : "Continue"}
           </Button>
+          {!businessName.trim() && (
+            <p className="text-xs text-center text-amber-600">Fill in business name to continue</p>
+          )}
           <p className="text-xs text-center text-gray-400">
-            Already registered? <button onClick={() => setMode("login")} className="text-blue-600 hover:underline">Sign in</button>
+            Already registered? <button onClick={() => { setMode("login"); setError(""); }} className="text-blue-600 hover:underline">Sign in</button>
           </p>
         </CardContent>
       </Card>

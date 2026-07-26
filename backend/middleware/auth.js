@@ -25,13 +25,15 @@ module.exports = async (req, res, next) => {
   try {
     let user = null;
     let merchant = null;
+    let customer = null;
 
     if (isCompactJWS(token)) {
       try {
         const { payload } = await jwtVerify(token, privyJWKS, { issuer: "privy.io", audience: process.env.PRIVY_APP_ID });
         user = await prisma.user.findUnique({ where: { privyUserId: payload.sub } });
         merchant = await prisma.merchant.findUnique({ where: { privyUserId: payload.sub } });
-        if (!user && !merchant) {
+        customer = await prisma.customer.findUnique({ where: { privyUserId: payload.sub } });
+        if (!user && !merchant && !customer) {
           const email = payload.email || null;
           if (email && email.toLowerCase() === ADMIN_EMAIL) {
             user = await prisma.user.create({
@@ -46,8 +48,12 @@ module.exports = async (req, res, next) => {
         if (merchant && payload.email && !merchant.email) {
           merchant = await prisma.merchant.update({ where: { id: merchant.id }, data: { email: payload.email } });
         }
+        if (customer && payload.email && !customer.email) {
+          customer = await prisma.customer.update({ where: { id: customer.id }, data: { email: payload.email } });
+        }
         if (user) req.user = user;
         if (merchant) req.merchant = merchant;
+        if (customer) req.customer = customer;
         if (req.user) {
           if (req.user.status && req.user.status !== "ACTIVE") {
             return res.status(403).json({ error: `Account ${req.user.status.toLowerCase()}` });
@@ -57,6 +63,12 @@ module.exports = async (req, res, next) => {
         if (req.merchant) {
           if (req.merchant.status && req.merchant.status !== "ACTIVE") {
             return res.status(403).json({ error: `Account ${req.merchant.status.toLowerCase()}` });
+          }
+          return next();
+        }
+        if (req.customer) {
+          if (!req.customer.isActive || req.customer.isBlocked) {
+            return res.status(403).json({ error: "Account not active" });
           }
           return next();
         }
@@ -73,6 +85,15 @@ module.exports = async (req, res, next) => {
         return res.status(403).json({ error: `Account ${merchant.status.toLowerCase()}` });
       }
       req.merchant = merchant;
+      return next();
+    }
+    if (decoded.type === "customer") {
+      customer = await prisma.customer.findUnique({ where: { id: decoded.customerId } });
+      if (!customer) return res.status(401).json({ error: "Customer not found" });
+      if (!customer.isActive || customer.isBlocked) {
+        return res.status(403).json({ error: "Account not active" });
+      }
+      req.customer = customer;
       return next();
     }
     user = await prisma.user.findUnique({ where: { id: decoded.userId } });

@@ -104,9 +104,17 @@ router.post("/admin/login", async (req, res) => {
     if (!user) {
       const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "").toLowerCase();
       if (email.toLowerCase() === ADMIN_EMAIL) {
-        user = await prisma.user.create({
-          data: { privyUserId: payload.sub, email, name: "Admin", isAdmin: true },
-        });
+        user = await prisma.user.findUnique({ where: { email } });
+        if (user) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { privyUserId: payload.sub, isAdmin: true },
+          });
+        } else {
+          user = await prisma.user.create({
+            data: { privyUserId: payload.sub, email, name: "Admin", isAdmin: true },
+          });
+        }
       } else {
         return res.status(403).json({ error: "Not authorized as admin" });
       }
@@ -120,6 +128,90 @@ router.post("/admin/login", async (req, res) => {
     console.error("Admin login error:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Customer registration via Privy
+router.post("/customer/register", async (req, res) => {
+  try {
+    const { token: privyToken, firstName, lastName, username, phone, dateOfBirth, gender, country, state, city, timezone, language, marketingConsent } = req.body;
+    if (!privyToken) return res.status(400).json({ error: "Token required" });
+    if (!firstName || !lastName) return res.status(400).json({ error: "First and last name required" });
+    if (!req.body.email) return res.status(400).json({ error: "Email is required" });
+
+    const payload = await verifyPrivyToken(privyToken);
+    const email = req.body.email;
+
+    const existing = await prisma.customer.findFirst({
+      where: { OR: [{ privyUserId: payload.sub }, { email }].filter(Boolean) },
+    });
+    if (existing) return res.status(400).json({ error: "Already registered. Please login." });
+
+    if (username) {
+      const usernameTaken = await prisma.customer.findUnique({ where: { username } });
+      if (usernameTaken) return res.status(400).json({ error: "Username taken" });
+    }
+
+    const customer = await prisma.customer.create({
+      data: {
+        privyUserId: payload.sub,
+        walletAddress: payload.wallet || payload.wallets?.[0]?.address || null,
+        email,
+        emailVerified: true,
+        firstName, lastName,
+        username: username || null,
+        phone: phone || null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        gender: gender || null,
+        country: country || null,
+        state: state || null,
+        city: city || null,
+        timezone: timezone || null,
+        language: language || null,
+        marketingConsent: marketingConsent === true,
+        isActive: true,
+        lastLoginAt: new Date(),
+      },
+    });
+
+    const token = sign({ customerId: customer.id, email: customer.email, type: "customer" });
+    res.json({ token, customer });
+  } catch (err) {
+    console.error("Customer register error:", err);
+    res.status(500).json({ error: err.message || "Registration failed" });
+  }
+});
+
+// Customer login via Privy
+router.post("/customer/login", async (req, res) => {
+  try {
+    const { token: privyToken, email: bodyEmail } = req.body;
+    if (!privyToken) return res.status(400).json({ error: "Token required" });
+
+    const payload = await verifyPrivyToken(privyToken);
+    const email = bodyEmail || payload.email || null;
+    if (!email) return res.status(400).json({ error: "Email required" });
+
+    let customer = await prisma.customer.findUnique({ where: { email } });
+    if (!customer) {
+      customer = await prisma.customer.findUnique({ where: { privyUserId: payload.sub } });
+    }
+    if (!customer) return res.status(404).json({ error: "Customer not found. Please register." });
+    if (!customer.isActive || customer.isBlocked) return res.status(403).json({ error: "Account not active" });
+
+    customer = await prisma.customer.update({ where: { id: customer.id }, data: { lastLoginAt: new Date() } });
+
+    const token = sign({ customerId: customer.id, email: customer.email, type: "customer" });
+    res.json({ token, customer });
+  } catch (err) {
+    console.error("Customer login error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Customer profile update
+router.patch("/customer/profile", async (req, res) => {
+  // Handled by auth middleware supporting customer JWTs
+  res.status(401).json({ error: "Not implemented here" });
 });
 
 module.exports = router;

@@ -10,6 +10,15 @@ export const adminApi = {
   topup: (id, d) => api.post(`/admin/merchants/${id}/topup`, d),
 };
 
+export const customerApi = {
+  register: (d) => api.post("/auth/customer/register", d),
+  login: (d) => api.post("/auth/customer/login", d),
+  profile: () => api.get("/points/profile"),
+  updateProfile: (d) => api.patch("/points/profile", d),
+  transactions: () => api.get("/points/transactions"),
+  balanceByEmail: (email) => api.get(`/points/balance/${encodeURIComponent(email)}`),
+};
+
 export const merchantApi = {
   register: (d) => api.post("/auth/merchant/register", d, { headers: { "Content-Type": "multipart/form-data" } }),
   login: (d) => api.post("/auth/merchant/login", d),

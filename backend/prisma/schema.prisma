@@ -47,13 +47,33 @@ model Merchant {
 }
 
 model Customer {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  phone         String?
-  pointsBalance BigInt   @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String    @id @default(cuid())
+  privyUserId      String    @unique
+  embeddedWalletId String?   @unique
+  walletAddress    String?   @unique
+  email            String?   @unique
+  emailVerified    Boolean   @default(false)
+  firstName        String?
+  lastName         String?
+  username         String?   @unique
+  profileImage     String?
+  phone            String?
+  phoneVerified    Boolean   @default(false)
+  dateOfBirth      DateTime?
+  gender           String?
+  country          String?
+  state            String?
+  city             String?
+  timezone         String?
+  language         String?
+  isActive         Boolean   @default(true)
+  isBlocked        Boolean   @default(false)
+  marketingConsent Boolean   @default(false)
+  termsAcceptedAt  DateTime?
+  lastLoginAt      DateTime?
+  pointsBalance    BigInt    @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   pendingAwards PendingAward[]
   transactions  Transaction[]

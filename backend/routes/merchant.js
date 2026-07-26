@@ -2,6 +2,7 @@ const router = require("express").Router();
 const prisma = require("../services/prisma");
 const { sign } = require("../services/jwt");
 const auth = require("../middleware/auth");
+const { mintTokens, burnFromCustomer, getBalance, providerReady } = require("../services/blockchain");
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -13,7 +14,21 @@ function requireMerchant(req, res, next) {
 
 router.get("/status", auth, async (req, res) => {
   if (!req.merchant) return res.status(404).json({ error: "Not a merchant account" });
-  res.json({ merchant: req.merchant });
+
+  let onChainBalance = null;
+  if (providerReady && req.merchant.tokenContract && req.merchant.walletAddress) {
+    try {
+      onChainBalance = await getBalance(req.merchant.tokenContract, req.merchant.walletAddress);
+    } catch (e) {
+      console.warn("On-chain balance lookup failed:", e.message);
+    }
+  }
+
+  res.json({
+    merchant: req.merchant,
+    onChainBalance,
+    onChainMatch: onChainBalance !== null ? BigInt(req.merchant.tokenBalance).toString() === onChainBalance : null,
+  });
 });
 
 router.post("/refresh-token", auth, async (req, res) => {
@@ -27,15 +42,36 @@ router.post("/award", auth, requireMerchant, async (req, res) => {
   if (!customerEmail || !amount || +amount <= 0) return res.status(400).json({ error: "Valid email and amount required" });
 
   const merchant = req.merchant;
-  if (BigInt(merchant.tokenBalance) < BigInt(amount)) {
+
+  // Check on-chain balance first (source of truth), fallback to DB
+  let onChainBalance = null;
+  if (providerReady && merchant.tokenContract && merchant.walletAddress) {
+    try {
+      onChainBalance = await getBalance(merchant.tokenContract, merchant.walletAddress);
+    } catch (e) {
+      console.warn("On-chain balance check failed, using DB:", e.message);
+    }
+  }
+  const availableBalance = onChainBalance !== null ? onChainBalance : merchant.tokenBalance;
+  if (BigInt(availableBalance) < BigInt(amount)) {
     return res.status(400).json({ error: "Insufficient token balance" });
   }
 
   let customer = await prisma.customer.findUnique({ where: { email: customerEmail } });
   if (!customer) {
     customer = await prisma.customer.create({
-      data: { email: customerEmail, name: customerEmail.split("@")[0] },
+      data: { email: customerEmail, firstName: customerEmail.split("@")[0], isActive: true },
     });
+  }
+
+  let onChainTx = null;
+  if (providerReady && merchant.tokenContract && merchant.walletAddress && customer.walletAddress) {
+    try {
+      await burnFromCustomer(merchant.tokenContract, merchant.walletAddress, BigInt(amount));
+      onChainTx = await mintTokens(merchant.tokenContract, customer.walletAddress, BigInt(amount));
+    } catch (e) {
+      console.warn("On-chain award failed:", e.message);
+    }
   }
 
   await prisma.merchant.update({
@@ -60,13 +96,16 @@ router.post("/award", auth, requireMerchant, async (req, res) => {
     },
   });
 
-  res.json({ success: true, amount: +amount, customerEmail, customerBalance: (BigInt(customer.pointsBalance) + BigInt(amount)).toString() });
+  res.json({ success: true, amount: +amount, customerEmail, onChainTx,
+    customerBalance: (BigInt(customer.pointsBalance) + BigInt(amount)).toString(),
+    onChainBalance: onChainBalance !== null ? (BigInt(availableBalance) - BigInt(amount)).toString() : null,
+  });
 });
 
 router.get("/customers", auth, requireMerchant, async (req, res) => {
   const transactions = await prisma.transaction.findMany({
     where: { merchantId: req.merchant.id, type: "AWARD" },
-    include: { customer: { select: { email: true, name: true, pointsBalance: true } } },
+    include: { customer: { select: { email: true, firstName: true, lastName: true, pointsBalance: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -75,9 +114,11 @@ router.get("/customers", auth, requireMerchant, async (req, res) => {
     if (!tx.customer) continue;
     const email = tx.customer.email;
     if (!customerMap[email]) {
+      const fn = tx.customer.firstName || "";
+      const ln = tx.customer.lastName || "";
       customerMap[email] = {
         email,
-        name: tx.customer.name,
+        name: [fn, ln].filter(Boolean).join(" ") || email.split("@")[0],
         totalAwarded: BigInt(0),
         pointsBalance: tx.customer.pointsBalance,
         lastAward: tx.createdAt,
@@ -166,7 +207,17 @@ router.post("/checkout-success", auth, requireMerchant, async (req, res) => {
       },
     });
 
-    res.json({ success: true, amountNPR, grossTokens, fee, netTokens, merchant: updated });
+    // On-chain: mint ERC20 tokens to merchant wallet
+    let onChainTx = null;
+    if (providerReady && updated.tokenContract && updated.walletAddress) {
+      try {
+        onChainTx = await mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
+      } catch (e) {
+        console.warn("On-chain mint failed:", e.message);
+      }
+    }
+
+    res.json({ success: true, amountNPR, grossTokens, fee, netTokens, merchant: updated, onChainTx });
   } catch (err) {
     console.error("Checkout success error:", err);
     res.status(500).json({ error: err.message });
@@ -204,7 +255,17 @@ router.post("/topup", auth, async (req, res) => {
     },
   });
 
-  res.json({ success: true, amountNPR: +amountNPR, grossTokens, fee, netTokens, merchant: updated });
+  // On-chain: mint ERC20 tokens to merchant wallet
+  let onChainTx = null;
+  if (providerReady && updated.tokenContract && updated.walletAddress) {
+    try {
+      onChainTx = await mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
+    } catch (e) {
+      console.warn("On-chain mint failed:", e.message);
+    }
+  }
+
+  res.json({ success: true, amountNPR: +amountNPR, grossTokens, fee, netTokens, merchant: updated, onChainTx });
 });
 
 module.exports = router;
