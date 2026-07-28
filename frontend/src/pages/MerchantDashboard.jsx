@@ -9,14 +9,16 @@ import { EmptyState, LoadingState, ErrorState } from "../components/ui/empty-sta
 import { Skeleton, SkeletonCard } from "../components/ui/skeleton";
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter } from "../components/ui/dialog";
 import { useAuth } from "../contexts/AuthContext";
+import { useBlockchain } from "../contexts/BlockchainContext";
 import { merchantApi, points } from "../services/endpoints";
+import { BlockchainInfo, TxLink, ContractLink } from "../components/BlockchainBadge";
 
 import MerchantProducts from "./MerchantProducts";
 import {
   Store, Award, Gift, Coins, TrendingUp, Users, CheckCircle,
   AlertCircle, Clock, DollarSign, CreditCard, XCircle, Loader,
   RefreshCw, Mail, Package, Wallet, BarChart3, Search,
-  ArrowRight, ChevronRight, Plus, Sparkles, Zap, Star,
+  ArrowRight, ChevronRight, Plus, Sparkles, Zap, Star, Copy, Check, ExternalLink,
 } from "lucide-react";
 
 const TABS = [
@@ -183,15 +185,37 @@ export default function MerchantDashboard() {
 
 function OverviewTab({ merchantData, load }) {
   const balance = parseInt(merchantData?.tokenBalance || "0");
+  const onChainBalance = merchantData?.onChainBalance;
+  const walletAddress = merchantData?.walletAddress;
+  const tokenContract = merchantData?.tokenContract;
+  const [copiedWallet, setCopiedWallet] = useState(false);
+
+  const copyWallet = () => {
+    if (!walletAddress) return;
+    navigator.clipboard?.writeText(walletAddress);
+    setCopiedWallet(true);
+    setTimeout(() => setCopiedWallet(false), 2000);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card hover>
           <CardContent className="pt-5">
-            <CardStat label="Token Balance" value={`${balance.toLocaleString()} pts`} icon={Coins} />
+            <CardStat label="Token Balance (DB)" value={`${balance.toLocaleString()} pts`} icon={Coins} />
           </CardContent>
         </Card>
+        {onChainBalance !== null && onChainBalance !== undefined && (
+          <Card hover>
+            <CardContent className="pt-5">
+              <CardStat
+                label="On-Chain Balance"
+                value={`${BigInt(onChainBalance).toLocaleString()} pts`}
+                icon={Wallet}
+              />
+            </CardContent>
+          </Card>
+        )}
         <Card hover>
           <CardContent className="pt-5">
             <CardStat
@@ -251,31 +275,48 @@ function OverviewTab({ merchantData, load }) {
         <Card>
           <CardHeader>
             <CardTitle size="sm" className="flex items-center gap-2">
-              <Store className="w-4 h-4" /> Token Info
+              <Wallet className="w-4 h-4" /> On-Chain Info
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {merchantData?.tokenContract && (
+            {walletAddress && (
               <div className="flex items-center justify-between py-2 border-b border-border-primary">
-                <span className="text-sm text-text-tertiary">Token Contract</span>
-                <a href={`https://sepolia.etherscan.io/address/${merchantData.tokenContract}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-brand-600 hover:underline font-mono">
-                  {merchantData.tokenContract.slice(0, 6)}...{merchantData.tokenContract.slice(-4)}
-                </a>
+                <span className="text-sm text-text-tertiary">Wallet</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-mono text-text-secondary">
+                    {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                  </span>
+                  <button onClick={copyWallet} className="p-1 rounded hover:bg-surface-hover transition-colors" title="Copy wallet address">
+                    {copiedWallet ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-text-tertiary" />}
+                  </button>
+                  <ContractLink address={walletAddress} />
+                </div>
               </div>
             )}
-            {merchantData?.walletAddress && (
+            {tokenContract && (
+              <div className="flex items-center justify-between py-2 border-b border-border-primary">
+                <span className="text-sm text-text-tertiary">Token Contract</span>
+                <ContractLink address={tokenContract} />
+              </div>
+            )}
+            {onChainBalance !== null && onChainBalance !== undefined && (
               <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-text-tertiary">Wallet</span>
-                <span className="text-xs font-mono text-text-secondary">
-                  {merchantData.walletAddress.slice(0, 6)}...{merchantData.walletAddress.slice(-4)}
+                <span className="text-sm text-text-tertiary">On-Chain Balance</span>
+                <span className="text-sm font-mono font-medium text-emerald-600">
+                  {BigInt(onChainBalance).toLocaleString()} pts
                 </span>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      <BlockchainInfo
+        tokenContract={tokenContract}
+        walletAddress={walletAddress}
+        onChainBalance={onChainBalance}
+        onChainMatch={merchantData?.onChainMatch}
+      />
     </div>
   );
 }
@@ -363,11 +404,7 @@ function AwardTab({ merchantData, load }) {
             {merchantData?.tokenContract && (
               <div className="flex items-center gap-1.5 text-xs text-text-tertiary">
                 <span>Token:</span>
-                <a href={`https://sepolia.etherscan.io/address/${merchantData.tokenContract}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="text-brand-600 hover:underline font-mono">
-                  {merchantData.tokenContract.slice(0, 6)}...{merchantData.tokenContract.slice(-4)}
-                </a>
+                <ContractLink address={merchantData.tokenContract} />
               </div>
             )}
           </div>
@@ -502,11 +539,7 @@ function TransactionsTab() {
                     {tx.feeTokens ? `-${parseInt(tx.feeTokens).toLocaleString()}` : "-"}
                   </span></TCell>
                   <TCell>
-                    <span className="text-xs font-mono text-brand-600" title={tx.txHash}>
-                      {tx.txHash?.startsWith?.("0x")
-                        ? tx.txHash.slice(0, 8) + "..."
-                        : (tx.txHash?.slice(0, 12) + "...")}
-                    </span>
+                    <TxLink hash={tx.txHash} />
                   </TCell>
                 </TRow>
               ))}

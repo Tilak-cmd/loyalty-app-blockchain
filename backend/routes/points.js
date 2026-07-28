@@ -134,6 +134,11 @@ router.post("/redeem", auth, async (req, res) => {
     data: { pointsBalance: dbBalance - cost },
   });
 
+  await prisma.merchant.update({
+    where: { id: merchantId },
+    data: { tokenBalance: { increment: cost } },
+  });
+
   const tx = await prisma.transaction.create({
     data: {
       txHash,

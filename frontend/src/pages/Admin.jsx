@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/table";
 import { admin as adminApi } from "../services/endpoints";
-import { Shield, CheckCircle, XCircle, Users, Store, Activity, UserCheck, UserX, Trash2, RefreshCw, Fingerprint } from "lucide-react";
+import { Shield, CheckCircle, XCircle, Users, Store, Activity, UserCheck, UserX, Trash2, RefreshCw, Fingerprint, Copy, Check } from "lucide-react";
 
 const TABS = [
   { key: "stats", label: "Stats", icon: Activity },

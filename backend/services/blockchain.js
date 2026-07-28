@@ -186,6 +186,15 @@ const CHAIN_EXPLORERS = {
   31337: null, // local — no explorer
 };
 
+const NETWORK_NAMES = {
+  1: "Ethereum Mainnet",
+  5: "Goerli Testnet",
+  11155111: "Sepolia Testnet",
+  137: "Polygon Mainnet",
+  80001: "Mumbai Testnet",
+  31337: "Localhost (Hardhat)",
+};
+
 let cachedChainId = null;
 
 async function getChainId() {
@@ -197,15 +206,35 @@ async function getChainId() {
   } catch { return null; }
 }
 
+async function getNetworkName() {
+  const chainId = await getChainId();
+  return NETWORK_NAMES[chainId] || `Chain ID ${chainId}`;
+}
+
 async function getExplorerUrl() {
   const chainId = await getChainId();
   return CHAIN_EXPLORERS[chainId] || null;
+}
+
+async function getBlockNumber() {
+  if (!provider || !providerReady) return null;
+  try { return Number(await provider.getBlockNumber()); }
+  catch { return null; }
+}
+
+function getContractAddresses() {
+  return addresses;
+}
+
+function getRpcUrl() {
+  return process.env.RPC_URL || "http://127.0.0.1:8545";
 }
 
 module.exports = {
   deployTokenForMerchant, addMerchantToRegistry,
   mintTokens, burnTokens, burnFromCustomer, getBalance,
   storeDataHash, getDataHash, storeKycHash, getKycHash,
-  providerReady, getChainId, getExplorerUrl,
+  providerReady, getChainId, getNetworkName, getExplorerUrl,
+  getBlockNumber, getContractAddresses, getRpcUrl,
   ensureOnChainBalance,
 };

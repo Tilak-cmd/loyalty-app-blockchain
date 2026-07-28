@@ -55,3 +55,9 @@ export const publicMerchantApi = {
   list: () => api.get("/merchants/public"),
   products: (merchantId) => api.get(`/merchants/public/${merchantId}/products`),
 };
+
+export const blockchainApi = {
+  info: () => api.get("/blockchain/info"),
+  contracts: () => api.get("/blockchain/contracts"),
+  adminWallet: () => api.get("/blockchain/admin-wallet"),
+};

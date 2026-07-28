@@ -1,15 +1,23 @@
 const router = require("express").Router();
-const { getChainId, getExplorerUrl, providerReady } = require("../services/blockchain");
+const {
+  getChainId, getNetworkName, getExplorerUrl, getBlockNumber,
+  getContractAddresses, getRpcUrl, providerReady,
+} = require("../services/blockchain");
 
 router.get("/info", async (req, res) => {
-  const chainId = await getChainId();
-  const explorer = await getExplorerUrl();
-  res.json({ chainId, explorerUrl: explorer, providerReady });
+  const [chainId, networkName, explorerUrl, blockNumber] = await Promise.all([
+    getChainId(), getNetworkName(), getExplorerUrl(), getBlockNumber(),
+  ]);
+  res.json({ chainId, networkName, explorerUrl, blockNumber, providerReady, rpcUrl: getRpcUrl() });
 });
 
 router.get("/admin-wallet", async (req, res) => {
-  const wallet = (process.env.ADMIN_WALLETS || "").split(",")[0]?.trim() || null;
-  res.json({ adminWallet: wallet, providerReady });
+  const adminWallet = (process.env.ADMIN_WALLETS || "").split(",")[0]?.trim() || null;
+  res.json({ adminWallet, providerReady });
+});
+
+router.get("/contracts", async (req, res) => {
+  res.json({ contracts: getContractAddresses(), providerReady });
 });
 
 module.exports = router;

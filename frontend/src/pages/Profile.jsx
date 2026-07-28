@@ -5,7 +5,7 @@ import { Input, Label } from "../components/ui/input";
 import { Badge } from "../components/ui/table";
 import { useAuth } from "../contexts/AuthContext";
 import { auth } from "../services/endpoints";
-import { User, Mail, Phone, Wallet, Shield, Store, Coins, CheckCircle, AlertCircle, Save, Upload, Fingerprint, Camera } from "lucide-react";
+import { User, Mail, Phone, Wallet, Shield, Store, Coins, CheckCircle, AlertCircle, Save, Upload, Fingerprint, Camera, Copy, Check } from "lucide-react";
 
 export default function Profile() {
   const { user, login } = useAuth();
@@ -16,6 +16,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [copiedWallet, setCopiedWallet] = useState(false);
 
   if (!user) return null;
 
@@ -111,8 +112,12 @@ export default function Profile() {
             <div>
               <Label>Wallet</Label>
               <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2 font-mono">
-                <Wallet className="w-4 h-4 text-gray-400" />
-                {user.walletAddress.slice(0, 10)}...{user.walletAddress.slice(-6)}
+                <Wallet className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="flex-1">{user.walletAddress.slice(0, 10)}...{user.walletAddress.slice(-6)}</span>
+                <button onClick={() => { navigator.clipboard?.writeText(user.walletAddress); setCopiedWallet(true); setTimeout(() => setCopiedWallet(false), 2000); }}
+                  className="p-1 rounded hover:bg-gray-200 transition-colors">
+                  {copiedWallet ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-gray-400" />}
+                </button>
               </div>
             </div>
           )}
