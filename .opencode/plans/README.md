@@ -1,4 +1,4 @@
-# LoyalChain Redesign Plan
+# Namchepoints Redesign Plan
 
 ## 1. Core Architecture Overview
 

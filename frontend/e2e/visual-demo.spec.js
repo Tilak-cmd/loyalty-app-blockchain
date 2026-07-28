@@ -107,7 +107,7 @@ test.describe("Visual Demo — Step by Step", () => {
   test("Step 1: Landing Page", async ({ page }) => {
     await page.goto(BASE);
     await page.waitForTimeout(1000);
-    await expect(page.locator("text=LoyalChain").first()).toBeVisible();
+    await expect(page.locator("text=Namchepoints").first()).toBeVisible();
     await page.screenshot({ path: "screenshots/01-landing.png", fullPage: true });
     await page.getByRole("button", { name: "Customer Login" }).first().click();
     await page.waitForTimeout(500);
@@ -140,8 +140,8 @@ test.describe("Visual Demo — Step by Step", () => {
 
   test("Step 4: Customer Dashboard (mocked)", async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem("loyalchain_token", "demo-token");
-      localStorage.setItem("loyalchain_type", "customer");
+      localStorage.setItem("namchepoints_token", "demo-token");
+      localStorage.setItem("namchepoints_type", "customer");
     });
     await mockCustomerApi(page);
     await page.goto(`${BASE}/customer/dashboard`);
@@ -156,8 +156,8 @@ test.describe("Visual Demo — Step by Step", () => {
 
   test("Step 5: Customer Profile (mocked)", async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem("loyalchain_token", "demo-token");
-      localStorage.setItem("loyalchain_type", "customer");
+      localStorage.setItem("namchepoints_token", "demo-token");
+      localStorage.setItem("namchepoints_type", "customer");
     });
     await mockCustomerApi(page);
     await page.goto(`${BASE}/customer/profile`);
@@ -185,15 +185,15 @@ test.describe("Visual Demo — Step by Step", () => {
     await page.goto(`${BASE}/admin/login`);
     await page.waitForTimeout(500);
     await expect(page.locator("text=Admin Login")).toBeVisible();
-    await page.locator('input[type="email"]').fill("admin@loyalchain.io");
+    await page.locator('input[type="email"]').fill("admin@namchepoints.io");
     await page.screenshot({ path: "screenshots/09-admin-login.png", fullPage: true });
     await expect(page.locator('button:has-text("Continue with Email")')).toBeEnabled();
   });
 
   test("Step 8: Admin Panel (mocked)", async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem("loyalchain_token", "admin-token");
-      localStorage.setItem("loyalchain_type", "admin");
+      localStorage.setItem("namchepoints_token", "admin-token");
+      localStorage.setItem("namchepoints_type", "admin");
     });
     // Mock both admin API and the auth check
     await mockAdminApi(page);
@@ -201,7 +201,7 @@ test.describe("Visual Demo — Step by Step", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ type: "user", user: { id: "admin1", email: "admin@loyalchain.io", isAdmin: true } }),
+        body: JSON.stringify({ type: "user", user: { id: "admin1", email: "admin@namchepoints.io", isAdmin: true } }),
       });
     });
     await page.goto(`${BASE}/admin`);
@@ -220,8 +220,8 @@ test.describe("Visual Demo — Step by Step", () => {
 
   test("Step 9: Merchant Dashboard (mocked)", async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem("loyalchain_token", "merchant-token");
-      localStorage.setItem("loyalchain_type", "merchant");
+      localStorage.setItem("namchepoints_token", "merchant-token");
+      localStorage.setItem("namchepoints_type", "merchant");
     });
     await mockCustomerApi(page);
     await mockMerchantApi(page);

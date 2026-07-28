@@ -1,4 +1,4 @@
-# LoyalChain — Complete App Implementation Plan
+# Namchepoints — Complete App Implementation Plan
 
 ## Architecture Overview
 
@@ -99,7 +99,7 @@ app.use("/api/analytics", require("./routes/analytics"));
 Persistent top bar on every page except login:
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ 🪙 LoyalChain    │ Dashboard  Swap  │ user@email.com  │
+│ 🏔 Namchepoints  │ Dashboard  Swap  │ user@email.com  │
 │                  │ TopUp*  Award*   │   [Logout]      │
 │                  │ Redeem*  Admin** │                  │
 └─────────────────────────────────────────────────────────┘
@@ -191,7 +191,7 @@ Simple wrapper:
 #### 3.5 Polish `<title>` and Index
 **File:** `frontend/index.html`
 
-- Change `<title>` from "frontend" to "LoyalChain"
+- Change `<title>` from "frontend" to "Namchepoints"
 - Add meta description
 
 ---
@@ -224,7 +224,7 @@ Each endpoint aggregates from `Transaction` table using Prisma groupBy/aggregate
 ### Phase 5: Testing
 
 #### 5.1 Update E2E Tests
-**File:** `frontend/e2e/loyalchain.spec.js`
+**File:** `frontend/e2e/namchepoints.spec.js`
 
 - Add test for Navbar visibility on dashboard
 - Add test for Admin "All Merchants" tab loading
@@ -257,7 +257,7 @@ Iterate until all tests pass.
 | `frontend/src/pages/Redemption.jsx` | Edit | Remove hardcoded token contract |
 | `frontend/src/services/endpoints.js` | Edit | Add analytics endpoints |
 | `frontend/index.html` | Edit | Fix page title |
-| `frontend/e2e/loyalchain.spec.js` | Edit | Add new tests |
+| `frontend/e2e/namchepoints.spec.js` | Edit | Add new tests |
 
 ---
 

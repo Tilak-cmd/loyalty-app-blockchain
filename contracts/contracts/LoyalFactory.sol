@@ -15,7 +15,7 @@ contract LoyalFactory {
         string memory symbol,
         address merchant
     ) external returns (address) {
-        LoyalToken token = new LoyalToken(name, symbol, merchant);
+        LoyalToken token = new LoyalToken(name, symbol, merchant, msg.sender);
         emit TokenDeployed(merchant, address(token), name, symbol);
         return address(token);
     }

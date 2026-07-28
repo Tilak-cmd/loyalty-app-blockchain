@@ -11,8 +11,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("loyalchain_token");
-    const savedType = localStorage.getItem("loyalchain_type");
+    const savedToken = localStorage.getItem("namchepoints_token");
+    const savedType = localStorage.getItem("namchepoints_type");
     if (savedToken) {
       setToken(savedToken);
       api.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`;
@@ -38,8 +38,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = (newToken, type, data) => {
-    localStorage.setItem("loyalchain_token", newToken);
-    localStorage.setItem("loyalchain_type", type);
+    localStorage.setItem("namchepoints_token", newToken);
+    localStorage.setItem("namchepoints_type", type);
     api.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     setToken(newToken);
     setUser(null);
@@ -51,8 +51,8 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.removeItem("loyalchain_token");
-    localStorage.removeItem("loyalchain_type");
+    localStorage.removeItem("namchepoints_token");
+    localStorage.removeItem("namchepoints_type");
     delete api.defaults.headers.common["Authorization"];
     setToken(null);
     setUser(null);

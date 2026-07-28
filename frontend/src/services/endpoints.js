@@ -7,6 +7,7 @@ export const adminApi = {
   approve: (id) => api.patch(`/admin/merchants/${id}/approve`),
   reject: (id) => api.patch(`/admin/merchants/${id}/reject`),
   stats: () => api.get("/admin/stats"),
+  revenue: () => api.get("/admin/revenue"),
   topup: (id, d) => api.post(`/admin/merchants/${id}/topup`, d),
 };
 
@@ -29,6 +30,12 @@ export const merchantApi = {
   createCheckoutSession: (d) => api.post("/merchant/create-checkout-session", d),
   checkoutSuccess: (d) => api.post("/merchant/checkout-success", d),
   refreshToken: () => api.post("/merchant/refresh-token"),
+  transactions: () => api.get("/transactions"),
+};
+
+export const transactionsApi = {
+  list: (params) => api.get("/transactions", { params }),
+  all: (params) => api.get("/transactions/all", { params }),
 };
 
 export const points = {

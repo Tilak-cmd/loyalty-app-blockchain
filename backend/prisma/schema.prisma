@@ -45,6 +45,7 @@ model Merchant {
   transactions    Transaction[]
   pendingAwards   PendingAward[]
   products        Product[]
+  revenues        PlatformRevenue[]
 }
 
 model Customer {
@@ -93,30 +94,47 @@ model PendingAward {
 }
 
 model Transaction {
-  id            String   @id @default(cuid())
-  txHash        String   @unique
+  id            String    @id @default(cuid())
+  txHash        String    @unique
   type          String
   fromAddress   String
   toAddress     String
   amount        String
   tokenContract String?
-  status        String   @default("CONFIRMED")
+  grossTokens   BigInt?
+  feeTokens     BigInt?
+  status        String    @default("CONFIRMED")
   merchantId    String?
-  merchant      Merchant? @relation(fields: [merchantId], references: [id])
+  merchant      Merchant?  @relation(fields: [merchantId], references: [id])
   customerId    String?
-  customer      Customer? @relation(fields: [customerId], references: [id])
-  createdAt     DateTime @default(now())
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  productId     String?
+  product       Product?   @relation(fields: [productId], references: [id])
+  createdAt     DateTime   @default(now())
+}
+
+model PlatformRevenue {
+  id          String   @id @default(cuid())
+  type        String   @default("TOPUP_FEE")
+  amountNPR   BigInt?
+  tokenAmount BigInt?
+  currency    String   @default("NPR")
+  merchantId  String?
+  merchant    Merchant? @relation(fields: [merchantId], references: [id])
+  memo        String?
+  createdAt   DateTime @default(now())
 }
 
 model Product {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   merchantId  String
-  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  merchant    Merchant      @relation(fields: [merchantId], references: [id])
   name        String
   description String?
   imageUrl    String?
-  tokenPrice  BigInt   @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  tokenPrice  BigInt        @default(0)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  transactions Transaction[]
 }

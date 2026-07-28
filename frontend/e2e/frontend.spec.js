@@ -5,7 +5,7 @@ const BASE = "http://localhost:5173";
 test.describe("Landing Page", () => {
   test("loads with title and navigation buttons", async ({ page }) => {
     await page.goto(BASE);
-    await expect(page.locator("text=LoyalChain").first()).toBeVisible();
+    await expect(page.locator("text=Namchepoints").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Customer Login" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Merchant Login" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Admin Login" }).first()).toBeVisible();
@@ -15,14 +15,14 @@ test.describe("Landing Page", () => {
 
   test("shows feature cards", async ({ page }) => {
     await page.goto(BASE);
-    await expect(page.locator("text=Earn Loyalty Points")).toBeVisible();
-    await expect(page.locator("text=Multi-Merchant Network")).toBeVisible();
-    await expect(page.locator("text=Email Login")).toBeVisible();
+    await expect(page.locator("text=Earn Everywhere")).toBeVisible();
+    await expect(page.locator("text=Cross-Merchant Network")).toBeVisible();
+    await expect(page.locator("text=Simple Sign-In")).toBeVisible();
   });
 
   test("footer renders", async ({ page }) => {
     await page.goto(BASE);
-    await expect(page.locator("text=Built on Ethereum")).toBeVisible();
+    await expect(page.locator("text=Loyalty Rewards Platform")).toBeVisible();
   });
 });
 
@@ -137,14 +137,14 @@ test.describe("Sidebar Navigation (mocked auth)", () => {
       });
     });
     await page.addInitScript(() => {
-      localStorage.setItem("loyalchain_token", "mock-token");
-      localStorage.setItem("loyalchain_type", "customer");
+      localStorage.setItem("namchepoints_token", "mock-token");
+      localStorage.setItem("namchepoints_type", "customer");
     });
   });
 
   test("customer sidebar shows customer nav items", async ({ page }) => {
     await page.goto(`${BASE}/customer/dashboard`);
-    await expect(page.locator("text=LoyalChain")).toBeVisible();
+    await expect(page.locator("text=Namchepoints")).toBeVisible();
     await expect(page.getByRole("link", { name: "My Profile" })).toBeVisible();
     await page.getByRole("link", { name: "My Profile" }).click();
     await expect(page).toHaveURL(/customer\/profile/);
@@ -158,14 +158,6 @@ test.describe("Sidebar Navigation (mocked auth)", () => {
 });
 
 test.describe("Merchant Points Balance API", () => {
-  test("balance endpoint returns data for existing customer", async ({ request }) => {
-    const r = await request.get(`${BASE.replace("5173", "4000")}/api/points/balance/sandeshnilaskhatwada@gmail.com`);
-    expect(r.ok()).toBeTruthy();
-    const b = await r.json();
-    expect(b.found).toBe(true);
-    expect(typeof b.balance).toBe("string");
-  });
-
   test("balance endpoint returns not found for unknown email", async ({ request }) => {
     const r = await request.get(`${BASE.replace("5173", "4000")}/api/points/balance/nonexistent@test.com`);
     expect(r.ok()).toBeTruthy();

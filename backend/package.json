@@ -1,5 +1,5 @@
 {
-  "name": "loyalchain-backend",
+  "name": "namchepoints-backend",
   "version": "2.0.0",
   "scripts": {
     "start": "node index.js",

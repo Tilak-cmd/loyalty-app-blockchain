@@ -79,9 +79,12 @@ CREATE TABLE "Transaction" (
     "toAddress" TEXT NOT NULL,
     "amount" TEXT NOT NULL,
     "tokenContract" TEXT,
+    "grossTokens" BIGINT,
+    "feeTokens" BIGINT,
     "status" TEXT NOT NULL DEFAULT 'CONFIRMED',
     "merchantId" TEXT,
     "customerId" TEXT,
+    "productId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Transaction_pkey" PRIMARY KEY ("id")
@@ -122,4 +125,7 @@ ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_merchantId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Transaction" ADD CONSTRAINT "Transaction_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 

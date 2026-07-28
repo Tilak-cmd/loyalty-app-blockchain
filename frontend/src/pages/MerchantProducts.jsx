@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDesc } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input, Label } from "../components/ui/input";
-import { Badge } from "../components/ui/table";
+import { Badge } from "../components/ui/badge";
 import { merchantProductsApi } from "../services/endpoints";
 import { Package, Plus, Edit2, Trash2, AlertCircle, CheckCircle, X, Loader, Image, DollarSign } from "lucide-react";
 
@@ -93,7 +93,7 @@ export default function MerchantProducts() {
         <Card>
           <CardHeader>
             <CardTitle>{editingId ? "Edit Product" : "New Product"}</CardTitle>
-            <CardDesc>Customers can redeem points for this product</CardDesc>
+            <CardDescription>Customers can redeem points for this product</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 max-w-md">
             <div>

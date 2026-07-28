@@ -4,6 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useAuth } from "../contexts/AuthContext";
 import { LayoutDashboard, Repeat, Store, Shield, Menu, X, LogOut } from "lucide-react";
 import { cn } from "../lib/utils";
+import Logo from "./Logo";
 
 export default function Navbar() {
   const { user, logout: appLogout } = useAuth();
@@ -23,7 +24,7 @@ export default function Navbar() {
     setOpen(false);
     if (ready) await privyLogout();
     appLogout();
-    navigate("/login", { replace: true });
+    navigate("/customer/auth", { replace: true });
   };
 
   const active = (to) => location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
@@ -32,9 +33,8 @@ export default function Navbar() {
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
-          <Link to="/dashboard" className="flex items-center gap-2 font-bold text-lg text-blue-600 shrink-0">
-            <span className="text-xl">🪙</span>
-            <span className="hidden sm:inline">LoyalChain</span>
+          <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
+            <Logo size="sm" />
           </Link>
 
           <div className="hidden md:flex items-center gap-1">

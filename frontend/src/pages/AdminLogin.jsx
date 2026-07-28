@@ -1,74 +1,62 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { usePrivy } from "@privy-io/react-auth";
-import { Card, CardContent, CardHeader, CardTitle, CardDesc } from "../components/ui/card";
-import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
 import { adminApi } from "../services/endpoints";
-import { Shield, LogIn, AlertCircle, ArrowLeft, Loader } from "lucide-react";
+import { Shield, Loader, CheckCircle, AlertCircle } from "lucide-react";
+import Logo from "../components/Logo";
 
 export default function AdminLogin() {
-  const { login: appLogin, user } = useAuth();
-  const { login: privyLogin, logout: privyLogout, authenticated, user: privyUser, getAccessToken, ready } = usePrivy();
+  const { login: appLogin } = useAuth();
+  const { login: privyLogin, logout: privyLogout, ready, authenticated, user: privyUser, getAccessToken } = usePrivy();
   const navigate = useNavigate();
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [waitingForAuth, setWaitingForAuth] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [step, setStep] = useState("form");
 
-  useEffect(() => {
-    if (user?.isAdmin) navigate("/admin", { replace: true });
-  }, [user]);
-
-  useEffect(() => {
-    if (!waitingForAuth) return;
-    if (!authenticated || !privyUser || !ready) return;
-    setWaitingForAuth(false);
-    doLogin();
-  }, [authenticated, privyUser, ready, waitingForAuth]);
-
-  useEffect(() => {
-    if (!waitingForAuth) return;
-    const timer = setTimeout(() => {
-      setWaitingForAuth(false);
+  const handleLogin = async () => {
+    setLoading(true); setError("");
+    try {
+      await privyLogin();
+      setStep("wallet");
+    } catch (e) {
+      setError(e.message || "Login failed");
       setLoading(false);
-      setError("Authentication timed out. Please make sure you complete the email verification in the popup window.");
-    }, 60000);
-    return () => clearTimeout(timer);
-  }, [waitingForAuth]);
-
-  const startAuth = () => {
-    setError("");
-    setLoading(true);
-    if (authenticated && privyUser && ready) {
-      doLogin();
-    } else {
-      setWaitingForAuth(true);
-      privyLogin();
     }
   };
 
-  const doLogin = async () => {
-    setError("");
-    const privyEmail = privyUser?.email?.address;
-    if (!privyEmail) { setError("Could not get email from authentication"); setLoading(false); return; }
-    try {
-      const token = await getAccessToken();
-      const r = await adminApi.login({ token, email: privyEmail });
-      appLogin(r.data.token, "admin", r.data.user);
-      navigate("/admin");
-    } catch (e) { setError(e.response?.data?.error || "Not authorized as admin"); privyLogout(); }
-    setLoading(false);
-  };
+  if (step === "wallet" && ready && authenticated && privyUser?.email?.address) {
+    setTimeout(async () => {
+      const privyToken = await getAccessToken();
+      if (!privyToken) { setError("Failed to get auth token from Privy. Try again."); setStep("form"); setLoading(false); await privyLogout(); return; }
+      try {
+        const res = await adminApi.login({ email: privyUser.email.address, token: privyToken });
+        appLogin(res.data.token, "user", res.data.user);
+        setSuccess(true);
+        setTimeout(() => navigate("/admin"), 1000);
+      } catch (e) {
+        const msg = e.response?.data?.error || e.message || "Admin access denied";
+        setError(msg);
+        setStep("form");
+        await privyLogout();
+      }
+      setLoading(false);
+    }, 500);
+  }
 
-  if (waitingForAuth) {
+  if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-purple-50">
-        <Card className="w-full max-w-sm mx-4">
-          <CardContent className="py-8 text-center space-y-3">
-            <Loader className="w-8 h-8 animate-spin mx-auto text-purple-600" />
-            <p className="text-gray-700 font-medium">Check your email for a verification code...</p>
-            <p className="text-xs text-gray-400">A Privy popup should appear. Complete it to continue.</p>
+      <div className="min-h-screen flex items-center justify-center bg-surface-secondary p-4">
+        <Card className="max-w-md w-full text-center animate-scale-in">
+          <CardContent className="pt-8 pb-8">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-bold text-text-primary mb-2">Welcome, Admin</h2>
+            <Loader className="w-5 h-5 animate-spin mx-auto text-brand-600 mt-4" />
           </CardContent>
         </Card>
       </div>
@@ -76,25 +64,43 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-purple-50 px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <Link to="/" className="text-purple-600 font-bold text-lg flex items-center justify-center gap-1 mb-2"><ArrowLeft className="w-4 h-4" />Back</Link>
-          <CardTitle className="flex items-center justify-center gap-2"><Shield className="w-5 h-5" />Admin Login</CardTitle>
-          <CardDesc>Sign in with your admin email</CardDesc>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center text-sm text-purple-700">
-            <p>Click below to sign in with your admin email via Privy.</p>
-            <p className="text-xs mt-1">A one-time code will be sent to your email.</p>
+    <div className="min-h-screen flex items-center justify-center bg-surface-secondary p-4">
+      <div className="w-full max-w-sm space-y-6">
+        <div className="text-center">
+          <Link to="/" className="inline-flex items-center gap-2.5 mb-6">
+            <Logo size="sm" />
+          </Link>
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-7 h-7 text-brand-700" />
           </div>
-          <Button className="w-full" onClick={startAuth} disabled={loading}>
-            {loading ? <Loader className="w-4 h-4 mr-2 animate-spin" /> : <LogIn className="w-4 h-4 mr-2" />}
-            {loading ? "Opening Privy..." : "Sign in with Email"}
-          </Button>
-        </CardContent>
-      </Card>
+          <h1 className="text-2xl font-bold text-text-primary">Admin Access</h1>
+          <p className="text-sm text-text-tertiary mt-1">Sign in with your admin email</p>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            {error && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+                <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+              </div>
+            )}
+
+            <p className="text-xs text-text-tertiary text-center">
+              You'll be asked to verify your email via magic link. Only admin accounts can access this panel.
+            </p>
+
+            <Button className="w-full" size="lg" onClick={handleLogin} loading={loading}>
+              <Shield className="w-4 h-4" /> Sign In as Admin
+            </Button>
+
+            <div className="text-center pt-2 border-t border-border-primary">
+              <Link to="/" className="text-sm text-text-tertiary hover:text-text-primary transition-colors">
+                Back to home
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

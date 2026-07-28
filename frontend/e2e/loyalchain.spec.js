@@ -11,7 +11,7 @@ test.beforeAll(async ({ request }) => {
 
   // Create admin user (wallet matches ADMIN_WALLETS env var)
   const sr = await request.post(`${BASE}/auth/signup`, {
-    data: { walletAddress: WALLET, email: "admin@loyalchain.io", name: "Admin" },
+    data: { walletAddress: WALLET, email: "admin@namchepoints.io", name: "Admin" },
   });
   const sb = await sr.json();
   authToken = sb.token;
@@ -33,10 +33,10 @@ test.describe("Backend API Health", () => {
     expect(b.ok).toBe(true);
   });
 
-  test("root returns LoyalChain API", async ({ request }) => {
+  test("root returns Namchepoints API", async ({ request }) => {
     const r = await request.get(`http://localhost:4000/`);
     const b = await r.json();
-    expect(b.status).toBe("LoyalChain API");
+    expect(b.status).toBe("Namchepoints API");
   });
 });
 
@@ -254,7 +254,7 @@ test.describe("Swap & Transactions", () => {
 test.describe("Frontend Pages", () => {
   test("landing page loads", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("text=LoyalChain").first()).toBeVisible();
+    await expect(page.locator("text=Namchepoints").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Get Started Free" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
   });
@@ -274,8 +274,8 @@ test.describe("Frontend Pages", () => {
 
   test("login redirects when already authenticated", async ({ page, context }) => {
     await context.addInitScript((d) => {
-      localStorage.setItem("loyalchain_token", d.token);
-      localStorage.setItem("loyalchain_user", JSON.stringify(d.user));
+      localStorage.setItem("namchepoints_token", d.token);
+      localStorage.setItem("namchepoints_user", JSON.stringify(d.user));
     }, { token: authToken, user: authUser });
     await page.goto("/login");
     await expect(page).toHaveURL(/dashboard/);
@@ -283,20 +283,20 @@ test.describe("Frontend Pages", () => {
 
   test("dashboard shows welcome and navbar", async ({ page, context }) => {
     await context.addInitScript((d) => {
-      localStorage.setItem("loyalchain_token", d.token);
-      localStorage.setItem("loyalchain_user", JSON.stringify(d.user));
+      localStorage.setItem("namchepoints_token", d.token);
+      localStorage.setItem("namchepoints_user", JSON.stringify(d.user));
     }, { token: authToken, user: authUser });
     await page.goto("/dashboard");
     await expect(page.getByText(/Welcome back/)).toBeVisible();
-    await expect(page.locator("text=LoyalChain").first()).toBeVisible();
+    await expect(page.locator("text=Namchepoints").first()).toBeVisible();
     await expect(page.locator("text=Swap").first()).toBeVisible();
     await expect(page.locator("text=Logout")).toBeVisible();
   });
 
   test("swap page loads after login", async ({ page, context }) => {
     await context.addInitScript((d) => {
-      localStorage.setItem("loyalchain_token", d.token);
-      localStorage.setItem("loyalchain_user", JSON.stringify(d.user));
+      localStorage.setItem("namchepoints_token", d.token);
+      localStorage.setItem("namchepoints_user", JSON.stringify(d.user));
     }, { token: authToken, user: authUser });
     await page.goto("/swap");
     await expect(page.locator("text=Swap Tokens")).toBeVisible();
@@ -305,8 +305,8 @@ test.describe("Frontend Pages", () => {
 
   test("navbar navigation works between pages", async ({ page, context }) => {
     await context.addInitScript((d) => {
-      localStorage.setItem("loyalchain_token", d.token);
-      localStorage.setItem("loyalchain_user", JSON.stringify(d.user));
+      localStorage.setItem("namchepoints_token", d.token);
+      localStorage.setItem("namchepoints_user", JSON.stringify(d.user));
     }, { token: authToken, user: authUser });
     await page.goto("/dashboard");
     await page.getByRole("link", { name: "Swap" }).first().click();

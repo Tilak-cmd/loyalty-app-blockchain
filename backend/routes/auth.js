@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const multer = require("multer");
 const path = require("path");
+const { ethers } = require("ethers");
 const prisma = require("../services/prisma");
 const { sign } = require("../services/jwt");
 const { jwtVerify, createRemoteJWKSet, errors } = require("jose");
@@ -19,8 +20,18 @@ function isCompactJWS(token) {
 
 async function verifyPrivyToken(privyToken) {
   if (!isCompactJWS(privyToken)) throw new Error("Not a compact JWS");
-  const { payload } = await jwtVerify(privyToken, privyJWKS, { issuer: "privy.io", audience: process.env.PRIVY_APP_ID });
-  return payload;
+  try {
+    const { payload } = await jwtVerify(privyToken, privyJWKS, { issuer: "privy.io", audience: process.env.PRIVY_APP_ID });
+    return payload;
+  } catch (e) {
+    try {
+      const { payload } = await jwtVerify(privyToken, privyJWKS, { issuer: "https://auth.privy.io/", audience: process.env.PRIVY_APP_ID });
+      return payload;
+    } catch (e2) {
+      const { payload } = await jwtVerify(privyToken, privyJWKS, { issuer: "https://auth.privy.io", audience: process.env.PRIVY_APP_ID });
+      return payload;
+    }
+  }
 }
 
 // Merchant registration via Privy
@@ -39,6 +50,8 @@ router.post("/merchant/register", upload.fields([{ name: "logo", maxCount: 1 }])
 
     const logo = req.files?.logo?.[0]?.filename || null;
 
+    const walletAddr = payload.wallet || payload.wallets?.[0]?.address || ethers.Wallet.createRandom().address;
+
     const merchant = await prisma.merchant.create({
       data: {
         businessName,
@@ -46,7 +59,7 @@ router.post("/merchant/register", upload.fields([{ name: "logo", maxCount: 1 }])
         email,
         phone: phone || null,
         privyUserId: payload.sub,
-        walletAddress: payload.wallet || payload.wallets?.[0]?.address || null,
+        walletAddress: walletAddr,
         country: country || null,
         currency: currency || null,
         website: website || null,
@@ -151,10 +164,12 @@ router.post("/customer/register", async (req, res) => {
       if (usernameTaken) return res.status(400).json({ error: "Username taken" });
     }
 
+    const walletAddr = payload.wallet || payload.wallets?.[0]?.address || ethers.Wallet.createRandom().address;
+
     const customer = await prisma.customer.create({
       data: {
         privyUserId: payload.sub,
-        walletAddress: payload.wallet || payload.wallets?.[0]?.address || null,
+        walletAddress: walletAddr,
         email,
         emailVerified: true,
         firstName, lastName,

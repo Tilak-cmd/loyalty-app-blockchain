@@ -4,8 +4,11 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useAuth } from "../contexts/AuthContext";
 import { cn } from "../lib/utils";
 import {
-  LayoutDashboard, Store, Shield, Menu, X, LogOut, Building, User, BadgeCheck, Clock, Gift, Settings, Package,
+  LayoutDashboard, Store, Shield, Menu, X, LogOut, Building, User,
+  BadgeCheck, Clock, Gift, Settings, Package, Wallet, ArrowRight,
+  Home, Search, HelpCircle,
 } from "lucide-react";
+import Logo from "./Logo";
 
 export default function SidebarLayout({ children }) {
   const { user, merchant, customer, logout: appLogout, isAdmin, isMerchant, isPendingMerchant } = useAuth();
@@ -15,25 +18,22 @@ export default function SidebarLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems = [];
-
   if (isAdmin) {
     navItems.push({ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard });
     navItems.push({ to: "/admin", label: "Admin Panel", icon: Shield });
   }
-
   if (merchant) {
     navItems.push({ to: "/merchant/dashboard", label: "Dashboard", icon: Store });
     navItems.push({ to: "/merchant/products", label: "Products", icon: Package });
   }
-
   if (customer) {
     navItems.push({ to: "/customer/dashboard", label: "Dashboard", icon: LayoutDashboard });
-    navItems.push({ to: "/customer/profile", label: "My Profile", icon: User });
     navItems.push({ to: "/customer/redeem", label: "Redeem", icon: Gift });
+    navItems.push({ to: "/customer/profile", label: "Profile", icon: User });
   }
-
   if (!user && !merchant && !customer) {
-    navItems.push({ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard });
+    navItems.push({ to: "/", label: "Home", icon: Home });
+    navItems.push({ to: "/merchants", label: "Browse Merchants", icon: Store });
   }
 
   const handleLogout = async () => {
@@ -43,44 +43,47 @@ export default function SidebarLayout({ children }) {
     navigate("/", { replace: true });
   };
 
-  const active = (to) => location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
+  const active = (to) => {
+    if (to === "/") return location.pathname === "/";
+    return location.pathname.startsWith(to);
+  };
 
   const roleBadge = () => {
-    if (isAdmin) return { label: "Admin", color: "bg-purple-100 text-purple-800" };
-    if (isPendingMerchant) return { label: "Pending Merchant", color: "bg-yellow-100 text-yellow-800" };
-    if (isMerchant) return { label: "Merchant", color: "bg-green-100 text-green-800" };
-    if (customer) return { label: "Customer", color: "bg-blue-100 text-blue-800" };
-    return { label: "User", color: "bg-blue-100 text-blue-800" };
+    if (isAdmin) return { label: "Admin", color: "bg-brand-100 text-brand-700", icon: Shield };
+    if (isPendingMerchant) return { label: "Pending", color: "bg-amber-100 text-amber-700", icon: Clock };
+    if (isMerchant) return { label: "Merchant", color: "bg-emerald-100 text-emerald-700", icon: Store };
+    if (customer) return { label: "Customer", color: "bg-blue-100 text-blue-700", icon: User };
+    return { label: "Guest", color: "bg-gray-100 text-gray-700", icon: User };
   };
   const badge = roleBadge();
   const displayEmail = user?.email || merchant?.email || customer?.email || "";
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-surface-secondary flex">
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden animate-fade-in" onClick={() => setSidebarOpen(false)} />
       )}
 
       <aside className={cn(
-        "fixed md:sticky top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 flex flex-col transition-transform md:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full",
+        "fixed md:sticky top-0 left-0 z-50 h-full w-64 bg-surface border-r border-border-primary flex flex-col",
+        "transition-all duration-200 ease-out",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}>
-        <div className="h-14 flex items-center gap-2 px-4 border-b border-gray-200 shrink-0">
-          <span className="text-xl">L</span>
-          <span className="font-bold text-lg text-blue-600">LoyalChain</span>
+        <div className="h-14 flex items-center gap-2.5 px-5 border-b border-border-primary shrink-0">
+          <Logo size="sm" />
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 scrollbar-thin">
           {navItems.map((item) => (
             <Link
               key={item.to}
               to={item.to}
               onClick={() => setSidebarOpen(false)}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                 active(item.to)
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
+                  ? "bg-brand-50 text-brand-700"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover",
               )}
             >
               <item.icon className="w-5 h-5 shrink-0" />
@@ -89,46 +92,50 @@ export default function SidebarLayout({ children }) {
           ))}
         </nav>
 
-        <div className="border-t border-gray-200 p-3 space-y-3">
-          <div className="px-3 flex items-center gap-2">
-            <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", badge.color)}>
-              {badge.label === "Pending Merchant" ? <Clock className="w-3 h-3 mr-1" /> : <BadgeCheck className="w-3 h-3 mr-1" />}
+        <div className="border-t border-border-primary p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium",
+              badge.color,
+            )}>
+              <badge.icon className="w-3.5 h-3.5" />
               {badge.label}
-            </span>
+            </div>
           </div>
-          <div className="px-3 text-xs text-gray-500 truncate">{displayEmail}</div>
+          {displayEmail && (
+            <p className="px-1 text-xs text-text-tertiary truncate">{displayEmail}</p>
+          )}
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
           >
-            <LogOut className="w-5 h-5" />
-            Logout
+            <LogOut className="w-4 h-4" />
+            Sign out
           </button>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 h-14 flex items-center px-4 gap-3">
-          <button className="md:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setSidebarOpen(true)}>
-            <Menu className="w-5 h-5" />
+        <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md border-b border-border-primary h-14 flex items-center px-4 sm:px-6 gap-3">
+          <button className="md:hidden p-2 rounded-lg hover:bg-surface-hover transition-colors" onClick={() => setSidebarOpen(true)}>
+            <Menu className="w-5 h-5 text-text-secondary" />
           </button>
           <div className="flex-1" />
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full mr-2 bg-gray-100 text-gray-700">
-            {badge.label}
-          </span>
-          <span className="text-sm text-gray-500 truncate max-w-[160px] hidden sm:block">
-            {displayEmail}
-          </span>
-          <button
-            onClick={handleLogout}
-            className="hidden sm:inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </button>
+          <div className="hidden sm:flex items-center gap-2">
+            <span className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium",
+              badge.color,
+            )}>
+              <badge.icon className="w-3.5 h-3.5" />
+              {badge.label}
+            </span>
+            {displayEmail && (
+              <span className="text-sm text-text-tertiary max-w-[160px] truncate">{displayEmail}</span>
+            )}
+          </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto animate-fade-in">
           {children}
         </main>
       </div>
