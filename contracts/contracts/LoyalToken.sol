@@ -10,8 +10,9 @@ contract LoyalToken is ERC20, Ownable {
     constructor(
         string memory name,
         string memory symbol,
-        address _merchant
-    ) ERC20(name, symbol) Ownable(msg.sender) {
+        address _merchant,
+        address _owner
+    ) ERC20(name, symbol) Ownable(_owner) {
         merchant = _merchant;
     }
 

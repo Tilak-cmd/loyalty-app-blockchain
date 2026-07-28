@@ -6,7 +6,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((c) => {
-  const t = localStorage.getItem("loyalchain_token");
+  const t = localStorage.getItem("namchepoints_token");
   if (t) c.headers.Authorization = `Bearer ${t}`;
   return c;
 });
@@ -15,9 +15,9 @@ api.interceptors.response.use(
   (r) => r,
   (e) => {
     if (e.response?.status === 401) {
-      localStorage.removeItem("loyalchain_token");
-      localStorage.removeItem("loyalchain_type");
-      window.location.href = "/login";
+      localStorage.removeItem("namchepoints_token");
+      localStorage.removeItem("namchepoints_type");
+      window.location.href = "/customer/auth";
     }
     return Promise.reject(e);
   },

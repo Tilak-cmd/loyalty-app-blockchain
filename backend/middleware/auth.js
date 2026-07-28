@@ -1,12 +1,31 @@
 const { jwtVerify, createRemoteJWKSet } = require("jose");
 const { verify } = require("../services/jwt");
 const prisma = require("../services/prisma");
+const { ensureOnChainBalance, providerReady } = require("../services/blockchain");
 
 const privyJWKS = createRemoteJWKSet(new URL(`https://auth.privy.io/api/v1/apps/${process.env.PRIVY_APP_ID}/jwks.json`));
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "").toLowerCase();
 
 function isCompactJWS(token) {
   return typeof token === "string" && token.split(".").length === 3;
+}
+
+async function syncBalance(entity, type = "merchant") {
+  if (!providerReady) return null;
+  const tokenContract = entity.tokenContract;
+  const wallet = type === "merchant" ? entity.walletAddress : entity.walletAddress;
+  if (!tokenContract || !wallet) return null;
+  try {
+    const { getBalance } = require("../services/blockchain");
+    const onChain = await getBalance(tokenContract, wallet);
+    const dbBal = type === "merchant" ? entity.tokenBalance : entity.pointsBalance;
+    if (BigInt(onChain) === BigInt(dbBal)) return null;
+    await prisma[type === "merchant" ? "merchant" : "customer"].update({
+      where: { id: entity.id },
+      data: type === "merchant" ? { tokenBalance: BigInt(onChain) } : { pointsBalance: BigInt(onChain) },
+    });
+    return onChain;
+  } catch { return null; }
 }
 
 async function autoPromoteAdmin(user) {
@@ -64,12 +83,18 @@ module.exports = async (req, res, next) => {
           if (req.merchant.status && req.merchant.status !== "ACTIVE") {
             return res.status(403).json({ error: `Account ${req.merchant.status.toLowerCase()}` });
           }
+          syncBalance(req.merchant, "merchant").then(s => {
+            if (s) req.merchant.tokenBalance = s;
+          }).catch(() => {});
           return next();
         }
         if (req.customer) {
           if (!req.customer.isActive || req.customer.isBlocked) {
             return res.status(403).json({ error: "Account not active" });
           }
+          syncBalance(req.customer, "customer").then(s => {
+            if (s) req.customer.pointsBalance = s;
+          }).catch(() => {});
           return next();
         }
       } catch (joseErr) {
@@ -80,29 +105,47 @@ module.exports = async (req, res, next) => {
     const decoded = verify(token);
     if (decoded.type === "merchant") {
       merchant = await prisma.merchant.findUnique({ where: { id: decoded.merchantId } });
-      if (!merchant) return res.status(401).json({ error: "Merchant not found" });
+      if (!merchant) {
+        console.warn("Auth: merchant token but merchantId not found:", decoded.merchantId);
+        return res.status(401).json({ error: "Merchant not found", code: "MERCHANT_NOT_FOUND" });
+      }
       if (merchant.status && merchant.status !== "ACTIVE") {
-        return res.status(403).json({ error: `Account ${merchant.status.toLowerCase()}` });
+        return res.status(403).json({ error: `Account ${merchant.status.toLowerCase()}`, code: "ACCOUNT_INACTIVE" });
       }
       req.merchant = merchant;
+      syncBalance(merchant).then(s => {
+        if (s) req.merchant.tokenBalance = s;
+      }).catch(() => {});
       return next();
     }
     if (decoded.type === "customer") {
       customer = await prisma.customer.findUnique({ where: { id: decoded.customerId } });
-      if (!customer) return res.status(401).json({ error: "Customer not found" });
+      if (!customer) {
+        console.warn("Auth: customer token but customerId not found:", decoded.customerId);
+        return res.status(401).json({ error: "Customer not found", code: "CUSTOMER_NOT_FOUND" });
+      }
       if (!customer.isActive || customer.isBlocked) {
-        return res.status(403).json({ error: "Account not active" });
+        return res.status(403).json({ error: "Account not active", code: "ACCOUNT_INACTIVE" });
       }
       req.customer = customer;
+      syncBalance(customer, "customer").then(s => {
+        if (s && s !== null) req.customer.pointsBalance = s;
+      }).catch(() => {});
       return next();
     }
     user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-    if (!user) return res.status(401).json({ error: "User not found" });
+    if (!user) {
+      console.warn("Auth: token decoded but user not found. Payload:", JSON.stringify(decoded));
+      return res.status(401).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    }
     user = await autoPromoteAdmin(user);
     if (user.status && user.status !== "ACTIVE") {
-      return res.status(403).json({ error: `Account ${user.status.toLowerCase()}` });
+      return res.status(403).json({ error: `Account ${user.status.toLowerCase()}`, code: "ACCOUNT_INACTIVE" });
     }
     req.user = user;
     next();
-  } catch { res.status(401).json({ error: "Invalid token" }); }
+  } catch (err) {
+    console.warn("Auth: JWT verification failed:", err.message);
+    res.status(401).json({ error: "Invalid token", code: "INVALID_TOKEN" });
+  }
 };

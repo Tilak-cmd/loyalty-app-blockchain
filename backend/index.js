@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("./services/env").load();
 
 BigInt.prototype.toJSON = function () { return this.toString(); };
 
@@ -17,7 +17,7 @@ app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.get("/", (req, res) => res.json({ status: "LoyalChain API", version: "2.0" }));
+app.get("/", (req, res) => res.json({ status: "Namchepoints API", version: "2.0" }));
 app.get("/api/health", (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
 app.use("/api/auth", require("./routes/auth"));
@@ -47,4 +47,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal error" });
 });
 
-app.listen(PORT, () => console.log(`LoyalChain API → http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Namchepoints API → http://localhost:${PORT}`));

@@ -1,15 +1,57 @@
 import { cn } from "../../lib/utils";
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 
-const Badge = ({ className, variant = "default", ...props }) => {
-  const m = { default: "bg-blue-100 text-blue-800", secondary: "bg-gray-100 text-gray-800", success: "bg-green-100 text-green-800", warning: "bg-yellow-100 text-yellow-800", danger: "bg-red-100 text-red-800" };
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", m[variant], className)} {...props} />;
+const Table = ({ className, ...props }) => (
+  <div className="w-full overflow-auto">
+    <table className={cn("w-full caption-bottom text-sm", className)} {...props} />
+  </div>
+);
+
+const THead = ({ className, ...props }) => (
+  <thead className={cn("border-b border-border-primary", className)} {...props} />
+);
+
+const TBody = ({ className, ...props }) => (
+  <tbody className={cn("[&_tr:last-child]:border-0", className)} {...props} />
+);
+
+const TRow = ({ className, clickable, ...props }) => (
+  <tr
+    className={cn(
+      "border-b border-border-primary transition-colors",
+      clickable ? "cursor-pointer hover:bg-surface-hover" : "",
+      className,
+    )}
+    {...props}
+  />
+);
+
+const THeadCell = ({ className, sortable, sortDir, onSort, ...props }) => {
+  const Component = sortable ? "button" : "th";
+  return (
+    <th
+      className={cn(
+        "h-11 px-4 text-left align-middle font-medium text-text-tertiary text-xs uppercase tracking-wider",
+        sortable && "cursor-pointer hover:text-text-secondary select-none",
+        className,
+      )}
+      onClick={sortable ? onSort : undefined}
+      scope="col"
+    >
+      <Component className="flex items-center gap-1.5">
+        {props.children}
+        {sortable && (
+          sortDir === "asc" ? <ChevronUp className="w-3.5 h-3.5" /> :
+          sortDir === "desc" ? <ChevronDown className="w-3.5 h-3.5" /> :
+          <ChevronsUpDown className="w-3.5 h-3.5 opacity-50" />
+        )}
+      </Component>
+    </th>
+  );
 };
 
-const Table = ({ className, ...props }) => <div className="w-full overflow-auto"><table className={cn("w-full caption-bottom text-sm", className)} {...props} /></div>;
-const THead = ({ className, ...props }) => <thead className={cn("[&_tr]:border-b", className)} {...props} />;
-const TBody = ({ className, ...props }) => <tbody className={cn("[&_tr:last-child]:border-0", className)} {...props} />;
-const TRow = ({ className, ...props }) => <tr className={cn("border-b transition-colors hover:bg-gray-50/50", className)} {...props} />;
-const THeadCell = ({ className, ...props }) => <th className={cn("h-12 px-4 text-left align-middle font-medium text-gray-500", className)} {...props} />;
-const TCell = ({ className, ...props }) => <td className={cn("p-4 align-middle", className)} {...props} />;
+const TCell = ({ className, ...props }) => (
+  <td className={cn("p-4 align-middle text-text-secondary", className)} {...props} />
+);
 
-export { Badge, Table, THead, TBody, TRow, THeadCell, TCell };
+export { Table, THead, TBody, TRow, THeadCell, TCell };

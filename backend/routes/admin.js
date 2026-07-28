@@ -82,24 +82,40 @@ router.post("/merchants/:id/topup", auth, requireAdmin, async (req, res) => {
     data: { tokenBalance: { increment: BigInt(netTokens) } },
   });
 
+  const txHash = "TOPUP:" + Date.now() + ":" + merchant.id;
   await prisma.transaction.create({
     data: {
-      txHash: "TOPUP:" + Date.now() + ":" + merchant.id,
+      txHash,
       type: "TOPUP",
       fromAddress: "admin",
       toAddress: merchant.email,
       amount: netTokens.toString(),
+      grossTokens: BigInt(grossTokens),
+      feeTokens: BigInt(fee),
+      tokenContract: updated.tokenContract,
       merchantId: merchant.id,
     },
   });
 
-  // On-chain: mint ERC20 tokens to merchant wallet
+  // Persist platform fee as revenue
+  await prisma.platformRevenue.create({
+    data: {
+      type: "TOPUP_FEE",
+      amountNPR: BigInt(+amountNPR),
+      tokenAmount: BigInt(fee),
+      currency: "NPR",
+      merchantId: merchant.id,
+      memo: `Admin topup: ${amountNPR} NPR (${fee} tokens fee at ${feeRate}%)`,
+    },
+  });
+
+  // On-chain: mint ERC20 tokens to merchant wallet + fee to admin wallet
   let onChainTx = null;
+  const adminWallet = (process.env.ADMIN_WALLETS || "").split(",")[0]?.trim();
   if (blockchain.providerReady && updated.tokenContract && updated.walletAddress) {
-    try {
-      onChainTx = await blockchain.mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
-    } catch (e) {
-      console.warn("On-chain mint failed:", e.message);
+    onChainTx = await blockchain.mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
+    if (fee > 0 && adminWallet && adminWallet !== updated.walletAddress) {
+      await blockchain.mintTokens(updated.tokenContract, adminWallet, BigInt(fee));
     }
   }
 
@@ -108,14 +124,89 @@ router.post("/merchants/:id/topup", auth, requireAdmin, async (req, res) => {
 
 // Get stats
 router.get("/stats", auth, requireAdmin, async (req, res) => {
-  const [totalMerchants, approvedMerchants, pendingMerchants, totalCustomers, totalTransactions] = await Promise.all([
+  const [totalMerchants, approvedMerchants, pendingMerchants, totalCustomers, totalTransactions, revenueAgg] = await Promise.all([
     prisma.merchant.count(),
     prisma.merchant.count({ where: { kybStatus: "APPROVED" } }),
     prisma.merchant.count({ where: { kybStatus: "PENDING" } }),
     prisma.customer.count(),
     prisma.transaction.count(),
+    prisma.platformRevenue.aggregate({ _sum: { tokenAmount: true, amountNPR: true } }),
   ]);
-  res.json({ stats: { totalMerchants, approvedMerchants, pendingMerchants, totalCustomers, totalTransactions } });
+
+  const totalRevenueTokens = revenueAgg._sum.tokenAmount?.toString() || "0";
+  const totalRevenueNPR = revenueAgg._sum.amountNPR?.toString() || "0";
+
+  res.json({
+    stats: {
+      totalMerchants,
+      approvedMerchants,
+      pendingMerchants,
+      totalCustomers,
+      totalTransactions,
+      totalRevenueTokens,
+      totalRevenueNPR,
+    },
+  });
+});
+
+// Revenue breakdown
+router.get("/revenue", auth, requireAdmin, async (req, res) => {
+  const [byMerchant, daily, recent] = await Promise.all([
+    // Per-merchant revenue
+    prisma.platformRevenue.groupBy({
+      by: ["merchantId"],
+      _sum: { tokenAmount: true, amountNPR: true },
+      _count: true,
+      orderBy: { _sum: { tokenAmount: "desc" } },
+    }),
+    // Daily revenue (last 30 days)
+    prisma.platformRevenue.groupBy({
+      by: ["createdAt"],
+      _sum: { tokenAmount: true, amountNPR: true },
+      _count: true,
+      where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      orderBy: { createdAt: "desc" },
+    }),
+    // Recent revenue entries
+    prisma.platformRevenue.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: { merchant: { select: { businessName: true, email: true } } },
+    }),
+  ]);
+
+  // Enrich per-merchant with business names
+  const merchantIds = byMerchant.map((r) => r.merchantId).filter(Boolean);
+  const merchants = merchantIds.length
+    ? await prisma.merchant.findMany({ where: { id: { in: merchantIds } }, select: { id: true, businessName: true } })
+    : [];
+  const merchantMap = Object.fromEntries(merchants.map((m) => [m.id, m.businessName]));
+
+  res.json({
+    byMerchant: byMerchant.map((r) => ({
+      merchantId: r.merchantId,
+      businessName: merchantMap[r.merchantId] || "Unknown",
+      totalTokens: r._sum.tokenAmount?.toString() || "0",
+      totalNPR: r._sum.amountNPR?.toString() || "0",
+      count: r._count,
+    })),
+    daily: daily.map((r) => ({
+      date: r.createdAt,
+      tokens: r._sum.tokenAmount?.toString() || "0",
+      npr: r._sum.amountNPR?.toString() || "0",
+      count: r._count,
+    })),
+    recent: recent.map((r) => ({
+      id: r.id,
+      type: r.type,
+      tokenAmount: r.tokenAmount?.toString() || "0",
+      amountNPR: r.amountNPR?.toString() || "0",
+      currency: r.currency,
+      merchantName: r.merchant?.businessName || null,
+      memo: r.memo,
+      createdAt: r.createdAt,
+    })),
+  });
 });
 
 module.exports = router;

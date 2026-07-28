@@ -44,7 +44,7 @@ export default function Login() {
         <CardHeader className="text-center">
           <Link to="/" className="text-blue-600 font-bold text-lg flex items-center justify-center gap-1 mb-2"><ArrowLeft className="w-4 h-4" />Back</Link>
           <CardTitle>Welcome back</CardTitle>
-          <CardDesc>Sign in to your LoyalChain account</CardDesc>
+          <CardDesc>Sign in to your Namchepoints account</CardDesc>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}

@@ -1,4 +1,5 @@
 const router = require("express").Router();
+const { ethers } = require("ethers");
 const prisma = require("../services/prisma");
 const { sign } = require("../services/jwt");
 const auth = require("../middleware/auth");
@@ -7,8 +8,13 @@ const { mintTokens, burnFromCustomer, getBalance, providerReady } = require("../
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 function requireMerchant(req, res, next) {
-  if (!req.merchant) return res.status(403).json({ error: "Merchant only" });
-  if (req.merchant.kybStatus !== "APPROVED") return res.status(403).json({ error: "Merchant not approved" });
+  if (!req.merchant) {
+    const role = req.user ? "user" : req.customer ? "customer" : "anonymous";
+    return res.status(403).json({ error: "Merchant only", code: "NOT_MERCHANT", role });
+  }
+  if (req.merchant.kybStatus !== "APPROVED") {
+    return res.status(403).json({ error: `Merchant not approved (${req.merchant.kybStatus})`, code: "KYB_NOT_APPROVED" });
+  }
   next();
 }
 
@@ -43,16 +49,7 @@ router.post("/award", auth, requireMerchant, async (req, res) => {
 
   const merchant = req.merchant;
 
-  // Check on-chain balance first (source of truth), fallback to DB
-  let onChainBalance = null;
-  if (providerReady && merchant.tokenContract && merchant.walletAddress) {
-    try {
-      onChainBalance = await getBalance(merchant.tokenContract, merchant.walletAddress);
-    } catch (e) {
-      console.warn("On-chain balance check failed, using DB:", e.message);
-    }
-  }
-  const availableBalance = onChainBalance !== null ? onChainBalance : merchant.tokenBalance;
+  const availableBalance = merchant.tokenBalance;
   if (BigInt(availableBalance) < BigInt(amount)) {
     return res.status(400).json({ error: "Insufficient token balance" });
   }
@@ -60,20 +57,14 @@ router.post("/award", auth, requireMerchant, async (req, res) => {
   let customer = await prisma.customer.findUnique({ where: { email: customerEmail } });
   if (!customer) {
     customer = await prisma.customer.create({
-      data: { email: customerEmail, firstName: customerEmail.split("@")[0], isActive: true },
+      data: { email: customerEmail, firstName: customerEmail.split("@")[0], isActive: true, privyUserId: "award-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8), walletAddress: ethers.Wallet.createRandom().address },
     });
   }
 
   let onChainTx = null;
-  if (providerReady && merchant.tokenContract && merchant.walletAddress && customer.walletAddress) {
-    try {
-      await burnFromCustomer(merchant.tokenContract, merchant.walletAddress, BigInt(amount));
-      onChainTx = await mintTokens(merchant.tokenContract, customer.walletAddress, BigInt(amount));
-    } catch (e) {
-      return res.status(500).json({ error: "On-chain award failed — DB not updated. " + e.message });
-    }
-  } else if (providerReady && customer.walletAddress && (!merchant.tokenContract || !merchant.walletAddress)) {
-    return res.status(400).json({ error: "Merchant has no token contract. Contact support." });
+  if (merchant.tokenContract && merchant.walletAddress && customer.walletAddress) {
+    await burnFromCustomer(merchant.tokenContract, merchant.walletAddress, BigInt(amount));
+    onChainTx = await mintTokens(merchant.tokenContract, customer.walletAddress, BigInt(amount));
   }
 
   await prisma.merchant.update({
@@ -100,9 +91,11 @@ router.post("/award", auth, requireMerchant, async (req, res) => {
     },
   });
 
-  res.json({ success: true, amount: +amount, customerEmail, onChainTx,
+  res.json({
+    success: true, amount: +amount, customerEmail, onChainTx,
+    merchantName: merchant.businessName,
+    customerName: [customer.firstName, customer.lastName].filter(Boolean).join(" ") || customer.email,
     customerBalance: (BigInt(customer.pointsBalance) + BigInt(amount)).toString(),
-    onChainBalance: onChainBalance !== null ? (BigInt(availableBalance) - BigInt(amount)).toString() : null,
   });
 });
 
@@ -200,13 +193,13 @@ router.post("/checkout-success", auth, requireMerchant, async (req, res) => {
       data: { tokenBalance: { increment: BigInt(netTokens) } },
     });
 
-    // On-chain: mint ERC20 tokens to merchant wallet
+    // On-chain: mint ERC20 tokens to merchant wallet + fee to admin wallet
     let onChainTx = null;
+    const adminWallet = (process.env.ADMIN_WALLETS || "").split(",")[0]?.trim();
     if (providerReady && updated.tokenContract && updated.walletAddress) {
-      try {
-        onChainTx = await mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
-      } catch (e) {
-        console.warn("On-chain mint failed:", e.message);
+      onChainTx = await mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
+      if (fee > 0 && adminWallet && adminWallet !== updated.walletAddress) {
+        await mintTokens(updated.tokenContract, adminWallet, BigInt(fee));
       }
     }
 
@@ -218,8 +211,22 @@ router.post("/checkout-success", auth, requireMerchant, async (req, res) => {
         fromAddress: onChainTx?.hash?.startsWith?.("0x") ? "stripe:" + updated.walletAddress : "stripe",
         toAddress: updated.email,
         amount: netTokens.toString(),
+        grossTokens: BigInt(grossTokens),
+        feeTokens: BigInt(fee),
         tokenContract: updated.tokenContract,
         merchantId,
+      },
+    });
+
+    // Persist platform fee as revenue
+    await prisma.platformRevenue.create({
+      data: {
+        type: "TOPUP_FEE",
+        amountNPR: BigInt(amountNPR),
+        tokenAmount: BigInt(fee),
+        currency: "NPR",
+        merchantId,
+        memo: `Fee for ${amountNPR} NPR topup (${fee} tokens at ${feeRate}%)`,
       },
     });
 
@@ -250,13 +257,13 @@ router.post("/topup", auth, async (req, res) => {
     data: { tokenBalance: { increment: BigInt(netTokens) } },
   });
 
-  // On-chain: mint ERC20 tokens to merchant wallet
+  // On-chain: mint ERC20 tokens to merchant wallet + fee to admin wallet
   let onChainTx = null;
+  const adminWallet = (process.env.ADMIN_WALLETS || "").split(",")[0]?.trim();
   if (providerReady && updated.tokenContract && updated.walletAddress) {
-    try {
-      onChainTx = await mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
-    } catch (e) {
-      console.warn("On-chain mint failed:", e.message);
+    onChainTx = await mintTokens(updated.tokenContract, updated.walletAddress, BigInt(netTokens));
+    if (fee > 0 && adminWallet && adminWallet !== updated.walletAddress) {
+      await mintTokens(updated.tokenContract, adminWallet, BigInt(fee));
     }
   }
 
@@ -268,6 +275,8 @@ router.post("/topup", auth, async (req, res) => {
       fromAddress: onChainTx?.hash?.startsWith?.("0x") ? (req.user?.isAdmin ? "admin:" + updated.walletAddress : "stripe:" + updated.walletAddress) : (req.user?.isAdmin ? "admin" : "stripe"),
       toAddress: updated.email,
       amount: netTokens.toString(),
+      grossTokens: BigInt(grossTokens),
+      feeTokens: BigInt(fee),
       tokenContract: updated.tokenContract,
       merchantId: merchant.id,
     },

@@ -33,21 +33,42 @@ try {
     : {};
 } catch {}
 
+let MOCK_MODE = process.env.BLOCKCHAIN_MOCK === "true";
+
 try {
-  provider = new ethers.JsonRpcProvider(process.env.RPC_URL || "http://127.0.0.1:8545", null, { staticNetwork: true });
+  provider = new ethers.JsonRpcProvider(process.env.RPC_URL || "http://127.0.0.1:8545", null, { batchMaxCount: 1 });
   wallet = new ethers.Wallet(process.env.PRIVATE_KEY || ethers.ZeroHash, provider);
   providerReady = true;
 } catch (e) {
-  console.error("Blockchain provider init failed:", e.message);
+  console.warn("Blockchain RPC unavailable, enabling mock mode:", e.message);
+  MOCK_MODE = true;
+}
+
+if (MOCK_MODE) providerReady = true;
+
+let _nonceCache = null;
+
+async function getFreshNonce() {
+  if (!provider) return 0;
+  if (_nonceCache === null) {
+    _nonceCache = Number(await provider.getTransactionCount(wallet.address, "latest"));
+  }
+  const nonce = _nonceCache;
+  _nonceCache++;
+  return nonce;
 }
 
 function mockTx() {
+  if (!MOCK_MODE) throw new Error("Blockchain provider not available. Set BLOCKCHAIN_MOCK=true to run in mock mode.");
   const short = Date.now().toString(16).padStart(40, "0").slice(-40);
   return { hash: "0x" + short, mock: true };
 }
 
 async function deployTokenForMerchant(merchantAddr, name, symbol) {
-  if (!addresses?.factory || !providerReady) return mockTx().hash;
+  if (!addresses?.factory || !providerReady) {
+    if (MOCK_MODE) return "0x" + Date.now().toString(16).padStart(64, "0").slice(-64);
+    throw new Error("Blockchain provider not ready for token deployment");
+  }
   try {
     const factory = new ethers.Contract(addresses.factory, FACTORY_ABI, wallet);
     const tx = await factory.createToken(name, symbol, merchantAddr);
@@ -56,10 +77,13 @@ async function deployTokenForMerchant(merchantAddr, name, symbol) {
     const eventLog = receipt.logs.find(l => l.topics?.[0] === tokenDeployedTopic);
     if (eventLog) {
       const parsed = factory.interface.parseLog({ topics: eventLog.topics, data: eventLog.data });
-      return parsed?.args?.tokenAddress || mockTx().hash;
+      return parsed?.args?.tokenAddress || "0x" + Date.now().toString(16).padStart(64, "0").slice(-64);
     }
-    return mockTx().hash;
-  } catch { return mockTx().hash; }
+    throw new Error("Token deployment event not found");
+  } catch (e) {
+    if (MOCK_MODE) return "0x" + Date.now().toString(16).padStart(64, "0").slice(-64);
+    throw e;
+  }
 }
 
 async function addMerchantToRegistry(merchantAddr, tokenAddr) {
@@ -71,19 +95,44 @@ async function addMerchantToRegistry(merchantAddr, tokenAddr) {
 async function mintTokens(tokenAddr, to, amount) {
   if (!provider || !providerReady) return mockTx();
   const token = new ethers.Contract(tokenAddr, TOKEN_ABI, wallet);
-  return (await token.mint(to, amount)).wait();
+  const nonce = await getFreshNonce();
+  return (await token.mint(to, amount, { nonce })).wait();
 }
 
 async function burnTokens(tokenAddr, amount) {
   if (!provider || !providerReady) return mockTx();
   const token = new ethers.Contract(tokenAddr, TOKEN_ABI, wallet);
-  return (await token.burn(amount)).wait();
+  const nonce = await getFreshNonce();
+  return (await token.burn(amount, { nonce })).wait();
 }
 
 async function burnFromCustomer(tokenAddr, account, amount) {
   if (!provider || !providerReady) return mockTx();
   const token = new ethers.Contract(tokenAddr, TOKEN_ABI, wallet);
-  return (await token.burnFrom(account, amount)).wait();
+  const nonce = await getFreshNonce();
+  return (await token.burnFrom(account, amount, { nonce })).wait();
+}
+
+async function ensureOnChainBalance(tokenContract, address, dbBalance) {
+  if (!providerReady || !tokenContract || !address) return null;
+  try {
+    const onChain = BigInt(await getBalance(tokenContract, address));
+    if (onChain !== BigInt(dbBalance)) {
+      const diff = BigInt(dbBalance) - onChain;
+      if (diff > 0n) {
+        await mintTokens(tokenContract, address, diff);
+        return { synced: true, onChain: (onChain + diff).toString(), action: "minted", diff: diff.toString() };
+      } else if (diff < 0n) {
+        const absDiff = -diff;
+        await burnFromCustomer(tokenContract, address, absDiff);
+        return { synced: true, onChain: (onChain + diff).toString(), action: "burned", diff: absDiff.toString() };
+      }
+    }
+    return { synced: true, onChain: dbBalance, action: "match" };
+  } catch (e) {
+    console.warn("Auto-sync failed:", e.message);
+    return null;
+  }
 }
 
 async function getBalance(tokenAddr, address) {
@@ -96,11 +145,12 @@ async function getBalance(tokenAddr, address) {
 }
 
 async function storeDataHash(userAddress, hash) {
-  if (!addresses?.dataRegistry || !providerReady) return mockTx();
-  try {
-    const registry = new ethers.Contract(addresses.dataRegistry, DATA_REGISTRY_ABI, wallet);
-    return (await registry.setDataHash(userAddress, hash)).wait();
-  } catch { return mockTx(); }
+  if (!addresses?.dataRegistry || !providerReady) {
+    if (MOCK_MODE) return { hash: "0x" + Date.now().toString(16).padStart(64, "0").slice(-64), mock: true };
+    throw new Error("Blockchain provider not ready for storeDataHash");
+  }
+  const registry = new ethers.Contract(addresses.dataRegistry, DATA_REGISTRY_ABI, wallet);
+  return (await registry.setDataHash(userAddress, hash)).wait();
 }
 
 async function getDataHash(userAddress) {
@@ -113,11 +163,12 @@ async function getDataHash(userAddress) {
 }
 
 async function storeKycHash(merchantAddress, hash) {
-  if (!addresses?.dataRegistry || !providerReady) return mockTx();
-  try {
-    const registry = new ethers.Contract(addresses.dataRegistry, DATA_REGISTRY_ABI, wallet);
-    return (await registry.setKycHash(merchantAddress, hash)).wait();
-  } catch { return mockTx(); }
+  if (!addresses?.dataRegistry || !providerReady) {
+    if (MOCK_MODE) return { hash: "0x" + Date.now().toString(16).padStart(64, "0").slice(-64), mock: true };
+    throw new Error("Blockchain provider not ready for storeKycHash");
+  }
+  const registry = new ethers.Contract(addresses.dataRegistry, DATA_REGISTRY_ABI, wallet);
+  return (await registry.setKycHash(merchantAddress, hash)).wait();
 }
 
 async function getKycHash(merchantAddress) {
@@ -156,4 +207,5 @@ module.exports = {
   mintTokens, burnTokens, burnFromCustomer, getBalance,
   storeDataHash, getDataHash, storeKycHash, getKycHash,
   providerReady, getChainId, getExplorerUrl,
+  ensureOnChainBalance,
 };

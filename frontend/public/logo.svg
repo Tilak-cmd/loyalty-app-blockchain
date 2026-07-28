@@ -1,0 +1,31 @@
+<svg width="420" height="120" viewBox="0 0 420 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+<defs>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#8B7CF8"></stop>
+        <stop offset="100%" stop-color="#6E5EF7"></stop>
+    </linearGradient>
+</defs>
+
+<!-- ICON -->
+<g transform="translate(40,18)">
+
+    <!-- Left Ring -->
+    <circle cx="40" cy="30" r="26" stroke="#F4F4F6" stroke-width="8" fill="none"></circle>
+
+    <!-- Right Ring -->
+    <circle cx="86" cy="30" r="26" stroke="url(#purple)" stroke-width="8" fill="none"></circle>
+
+    <!-- Center Dot -->
+    <circle cx="63" cy="30" r="6" fill="#26233D"></circle>
+
+</g>
+
+<!-- TEXT -->
+<text x="40" y="105" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" fill="#F5F5F7">
+
+Namche<tspan fill="#8B7CF8">points</tspan>
+
+</text>
+
+</svg>
