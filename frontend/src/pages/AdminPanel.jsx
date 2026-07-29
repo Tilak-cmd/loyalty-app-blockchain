@@ -9,11 +9,14 @@ import { EmptyState, LoadingState, ErrorState } from "../components/ui/empty-sta
 import { SkeletonCard } from "../components/ui/skeleton";
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter } from "../components/ui/dialog";
 import { useAuth } from "../contexts/AuthContext";
+import { useBlockchain } from "../contexts/BlockchainContext";
 import { adminApi, transactionsApi } from "../services/endpoints";
+import { ContractLink, TxLink } from "../components/BlockchainBadge";
 import {
   Shield, Store, Users, CheckCircle, XCircle, Clock, AlertCircle,
   TrendingUp, RefreshCw, Search, Coins, DollarSign, Loader, ArrowRight,
   Activity, Server, Ban, UserCheck, CreditCard, Wallet, BarChart3, PieChart,
+  Copy, Check, ExternalLink,
 } from "lucide-react";
 
 const TABS = [
@@ -27,6 +30,7 @@ const TABS = [
 
 export default function AdminPanel() {
   const { user } = useAuth();
+  const { adminWallet, contracts, explorerUrl } = useBlockchain();
   const [tab, setTab] = useState("overview");
   const [stats, setStats] = useState(null);
   const [pendingMerchants, setPendingMerchants] = useState([]);
@@ -35,6 +39,7 @@ export default function AdminPanel() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [merchantSearch, setMerchantSearch] = useState("");
+  const [copiedWallet, setCopiedWallet] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -120,7 +125,7 @@ export default function AdminPanel() {
       />
 
       {tab === "overview" && (
-        <OverviewTab stats={stats} />
+        <OverviewTab stats={stats} contracts={contracts} adminWallet={adminWallet} explorerUrl={explorerUrl} />
       )}
       {tab === "pending" && (
         <PendingTab merchants={pendingMerchants} onApprove={approve} onReject={reject} />
@@ -139,9 +144,17 @@ export default function AdminPanel() {
   );
 }
 
-function OverviewTab({ stats }) {
+function OverviewTab({ stats, contracts, adminWallet, explorerUrl }) {
+  const [copiedAdmin, setCopiedAdmin] = useState(false);
   if (!stats) return <LoadingState />;
   const s = stats.stats || stats;
+
+  const copyAdmin = () => {
+    if (!adminWallet) return;
+    navigator.clipboard?.writeText(adminWallet);
+    setCopiedAdmin(true);
+    setTimeout(() => setCopiedAdmin(false), 2000);
+  };
 
   const cards = [
     { label: "Total Merchants", value: s.totalMerchants || 0, icon: Store, color: "bg-brand-50 text-brand-600" },
@@ -215,6 +228,55 @@ function OverviewTab({ stats }) {
           </CardContent>
         </Card>
       </div>
+
+      {adminWallet && (
+        <Card>
+          <CardHeader>
+            <CardTitle size="sm" className="flex items-center gap-2">
+              <Wallet className="w-4 h-4" /> Admin Wallet
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-mono text-text-primary">{adminWallet}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={copyAdmin} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors border border-border-primary">
+                  {copiedAdmin ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  {copiedAdmin ? "Copied" : "Copy"}
+                </button>
+                {explorerUrl && (
+                  <a href={`${explorerUrl}/address/${adminWallet}`} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-brand-600 hover:bg-brand-50 transition-colors border border-border-primary">
+                    <ExternalLink className="w-3 h-3" /> View
+                  </a>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {contracts && Object.keys(contracts).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle size="sm" className="flex items-center gap-2">
+              <Shield className="w-4 h-4" /> Smart Contracts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {Object.entries(contracts).map(([name, addr]) => (
+                <div key={name} className="flex items-center justify-between py-2 border-b border-border-primary last:border-0">
+                  <span className="text-sm text-text-tertiary capitalize">
+                    {name.replace(/([A-Z])/g, " $1").trim()}
+                  </span>
+                  <ContractLink address={addr} label={addr.slice(0, 6) + "..." + addr.slice(-4)} />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -327,6 +389,7 @@ function MerchantsTab({ merchants, search, onSearch }) {
                 <THeadCell>Email</THeadCell>
                 <THeadCell>Status</THeadCell>
                 <THeadCell sortable>Balance</THeadCell>
+                <THeadCell>Token Contract</THeadCell>
                 <THeadCell>Plan</THeadCell>
               </TRow>
             </THead>
@@ -341,6 +404,9 @@ function MerchantsTab({ merchants, search, onSearch }) {
                     </Badge>
                   </TCell>
                   <TCell><span className="font-medium">{parseInt(m.tokenBalance || "0").toLocaleString()}</span></TCell>
+                  <TCell>
+                    {m.tokenContract ? <ContractLink address={m.tokenContract} /> : <span className="text-xs text-text-tertiary">—</span>}
+                  </TCell>
                   <TCell><span className="text-text-secondary">{m.plan || "FREE"}</span></TCell>
                 </TRow>
               ))}
@@ -415,11 +481,7 @@ function TransactionsTab() {
                     {tx.feeTokens ? `-${parseInt(tx.feeTokens).toLocaleString()}` : "-"}
                   </span></TCell>
                   <TCell>
-                    <span className="text-xs font-mono text-brand-600" title={tx.txHash}>
-                      {tx.txHash?.startsWith?.("0x")
-                        ? tx.txHash.slice(0, 8) + "..."
-                        : (tx.txHash?.length > 16 ? tx.txHash.slice(0, 12) + "..." : tx.txHash || "-")}
-                    </span>
+                    <TxLink hash={tx.txHash} />
                   </TCell>
                 </TRow>
               ))}

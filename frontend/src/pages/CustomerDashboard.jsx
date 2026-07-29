@@ -8,22 +8,26 @@ import { Skeleton, SkeletonCard } from "../components/ui/skeleton";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/empty-state";
 import { Progress, TierProgress } from "../components/ui/progress";
 import { useAuth } from "../contexts/AuthContext";
+import { useBlockchain } from "../contexts/BlockchainContext";
 import { customerApi } from "../services/endpoints";
+import { TxLink } from "../components/BlockchainBadge";
 
 import {
   Gift, TrendingUp, Award, ArrowRight, User,
   Clock, ChevronRight,
-  RefreshCw, MapPin,
+  RefreshCw, MapPin, Wallet, Copy, Check, ExternalLink, Shield,
 } from "lucide-react";
 
 export default function CustomerDashboard() {
   const { customer } = useAuth();
+  const { explorerUrl } = useBlockchain();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState("activity");
+  const [copiedWallet, setCopiedWallet] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +53,14 @@ export default function CustomerDashboard() {
   const balance = parseInt(profile?.pointsBalance || "0");
   const earned = transactions.filter(t => t.type === "AWARD").reduce((s, t) => s + parseInt(t.amount || "0"), 0);
   const redeemed = transactions.filter(t => t.type === "REDEEM").reduce((s, t) => s + parseInt(t.amount || "0"), 0);
+  const walletAddress = profile?.walletAddress || customer?.walletAddress;
+
+  const copyWallet = () => {
+    if (!walletAddress) return;
+    navigator.clipboard?.writeText(walletAddress);
+    setCopiedWallet(true);
+    setTimeout(() => setCopiedWallet(false), 2000);
+  };
 
   if (loading) {
     return (
@@ -118,6 +130,32 @@ export default function CustomerDashboard() {
         </div>
       </div>
 
+      {walletAddress && (
+        <div className="bg-surface-secondary border border-border-primary rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-brand-600" />
+            </div>
+            <div>
+              <p className="text-xs text-text-tertiary">Your Wallet</p>
+              <p className="text-sm font-mono text-text-primary">{walletAddress.slice(0, 10)}...{walletAddress.slice(-6)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={copyWallet} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors border border-border-primary">
+              {copiedWallet ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedWallet ? "Copied" : "Copy"}
+            </button>
+            {explorerUrl && (
+              <a href={`${explorerUrl}/address/${walletAddress}`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-brand-600 hover:bg-brand-50 transition-colors border border-border-primary">
+                <ExternalLink className="w-3.5 h-3.5" /> View
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card hover>
           <CardContent className="pt-6">
@@ -158,6 +196,23 @@ export default function CustomerDashboard() {
             </div>
           </CardContent>
         </Card>
+        <Card hover>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-text-tertiary">On-Chain</p>
+                <p className="text-xl font-semibold text-text-primary">
+                  {profile?.onChainBalance !== null && profile?.onChainBalance !== undefined
+                    ? BigInt(profile.onChainBalance).toLocaleString()
+                    : "—"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -187,7 +242,7 @@ export default function CustomerDashboard() {
               />
             ) : (
               transactions
-                .filter(t => tab === "activity" || t.type === tab.toUpperCase())
+                .filter(t => tab === "activity" || (tab === "earned" ? t.type === "AWARD" : t.type === "REDEEM"))
                 .slice(0, 10)
                 .map((tx, i) => (
                   <Card key={tx.id} className="animate-slide-up" style={{ animationDelay: `${i * 30}ms` }}>
@@ -221,12 +276,9 @@ export default function CustomerDashboard() {
                           )}>
                             {tx.type === "AWARD" ? "+" : "-"}{parseInt(tx.amount).toLocaleString()}
                           </p>
-                          {tx.txHash?.startsWith?.("0x") && (
-            <a href={`https://sepolia.etherscan.io/tx/${tx.txHash}`} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-brand-600 hover:underline font-mono block mt-1">
-              {tx.txHash.slice(0, 10)}...{tx.txHash.slice(-6)}
-            </a>
-          )}
+                          <div className="mt-1">
+                            <TxLink hash={tx.txHash} />
+                          </div>
                         </div>
                       </div>
                     </CardContent>

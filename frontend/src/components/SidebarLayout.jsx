@@ -2,20 +2,32 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { usePrivy } from "@privy-io/react-auth";
 import { useAuth } from "../contexts/AuthContext";
+import { useBlockchain } from "../contexts/BlockchainContext";
 import { cn } from "../lib/utils";
 import {
   LayoutDashboard, Store, Shield, Menu, X, LogOut, Building, User,
   BadgeCheck, Clock, Gift, Settings, Package, Wallet, ArrowRight,
-  Home, Search, HelpCircle,
+  Home, Search, HelpCircle, Copy, Check, ExternalLink, Network,
 } from "lucide-react";
 import Logo from "./Logo";
 
 export default function SidebarLayout({ children }) {
   const { user, merchant, customer, logout: appLogout, isAdmin, isMerchant, isPendingMerchant } = useAuth();
+  const { chainId, networkName, blockNumber, providerReady, explorerUrl } = useBlockchain();
   const { logout: privyLogout, ready } = usePrivy();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [copiedWallet, setCopiedWallet] = useState(false);
+
+  const walletAddress = user?.walletAddress || merchant?.walletAddress || customer?.walletAddress;
+
+  const copyWallet = () => {
+    if (!walletAddress) return;
+    navigator.clipboard?.writeText(walletAddress);
+    setCopiedWallet(true);
+    setTimeout(() => setCopiedWallet(false), 2000);
+  };
 
   const navItems = [];
   if (isAdmin) {
@@ -93,6 +105,24 @@ export default function SidebarLayout({ children }) {
         </nav>
 
         <div className="border-t border-border-primary p-4 space-y-3">
+          {walletAddress && (
+            <div className="flex items-center gap-2 px-1">
+              <div className="w-5 h-5 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
+                <Wallet className="w-3 h-3 text-brand-600" />
+              </div>
+              <span className="flex-1 text-xs font-mono text-text-secondary truncate">
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </span>
+              <button onClick={copyWallet} className="p-1 rounded hover:bg-surface-hover transition-colors" title="Copy wallet address">
+                {copiedWallet ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-text-tertiary" />}
+              </button>
+              {explorerUrl && (
+                <a href={`${explorerUrl}/address/${walletAddress}`} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-surface-hover transition-colors" title="View on explorer">
+                  <ExternalLink className="w-3 h-3 text-text-tertiary" />
+                </a>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className={cn(
               "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium",
@@ -120,6 +150,21 @@ export default function SidebarLayout({ children }) {
           <button className="md:hidden p-2 rounded-lg hover:bg-surface-hover transition-colors" onClick={() => setSidebarOpen(true)}>
             <Menu className="w-5 h-5 text-text-secondary" />
           </button>
+
+          {providerReady && networkName && (
+            <div className="hidden sm:flex items-center gap-2 bg-surface-tertiary/50 rounded-full px-3 py-1 border border-border-primary">
+              <Network className="w-3.5 h-3.5 text-text-tertiary" />
+              <span className="text-xs font-medium text-text-secondary whitespace-nowrap">{networkName}</span>
+              {chainId && <span className="text-[10px] text-text-tertiary font-mono">#{chainId}</span>}
+              {blockNumber !== null && blockNumber !== undefined && (
+                <span className="text-[10px] text-text-tertiary flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                  Block {blockNumber}
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex-1" />
           <div className="hidden sm:flex items-center gap-2">
             <span className={cn(
