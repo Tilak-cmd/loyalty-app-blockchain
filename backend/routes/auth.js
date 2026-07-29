@@ -37,9 +37,12 @@ async function verifyPrivyToken(privyToken) {
 // Merchant registration via Privy
 router.post("/merchant/register", upload.fields([{ name: "logo", maxCount: 1 }]), async (req, res) => {
   try {
-    const { token: privyToken, businessName, legalBusinessName, phone, country, currency, website, email: bodyEmail } = req.body;
+    const { token: privyToken, businessName, legalBusinessName, phone, country, currency, website, registrationNo, vat, pan, email: bodyEmail } = req.body;
     if (!privyToken) return res.status(400).json({ error: "Auth token required" });
     if (!businessName) return res.status(400).json({ error: "Business name is required" });
+    if (!registrationNo && !vat && !pan) {
+      return res.status(400).json({ error: "At least one of Company Registration Number, VAT, or PAN is required" });
+    }
 
     const payload = await verifyPrivyToken(privyToken);
     const email = payload.email || bodyEmail || null;
@@ -58,6 +61,9 @@ router.post("/merchant/register", upload.fields([{ name: "logo", maxCount: 1 }])
         legalBusinessName: legalBusinessName || null,
         email,
         phone: phone || null,
+        registrationNo: registrationNo || null,
+        vat: vat || null,
+        pan: pan || null,
         privyUserId: payload.sub,
         walletAddress: walletAddr,
         country: country || null,

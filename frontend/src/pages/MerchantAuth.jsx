@@ -25,10 +25,15 @@ export default function MerchantAuth() {
   const [form, setForm] = useState({
     businessName: "", legalBusinessName: "", phone: "", country: "", currency: "",
     website: "", logo: null,
+    registrationNo: "", vat: "", pan: "",
   });
 
   const handleRegister = async () => {
     if (!form.businessName.trim()) { setError("Business name is required"); return; }
+    if (!form.registrationNo.trim() && !form.vat.trim() && !form.pan.trim()) {
+      setError("At least one of Company Registration Number, VAT, or PAN is required");
+      return;
+    }
     setLoading(true); setError("");
     try {
       const fd = new FormData();
@@ -189,6 +194,33 @@ export default function MerchantAuth() {
                     onChange={(e) => setForm({ ...form, legalBusinessName: e.target.value })}
                   />
                 </div>
+                <div>
+                  <Label>Company Registration Number</Label>
+                  <Input
+                    placeholder="e.g. REG-001"
+                    value={form.registrationNo}
+                    onChange={(e) => setForm({ ...form, registrationNo: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>VAT Number</Label>
+                    <Input
+                      placeholder="e.g. 123456789"
+                      value={form.vat}
+                      onChange={(e) => setForm({ ...form, vat: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>PAN Number</Label>
+                    <Input
+                      placeholder="e.g. 123456789"
+                      value={form.pan}
+                      onChange={(e) => setForm({ ...form, pan: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-text-tertiary -mt-2">At least one of Company Registration No., VAT, or PAN is required</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Country</Label>

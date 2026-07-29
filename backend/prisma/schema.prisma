@@ -30,6 +30,9 @@ model Merchant {
   currency         String?
   website          String?
   logo             String?
+  registrationNo   String?
+  vat              String?
+  pan              String?
   isVerified       Boolean  @default(false)
   kybStatus        String?
   plan             String   @default("FREE")
