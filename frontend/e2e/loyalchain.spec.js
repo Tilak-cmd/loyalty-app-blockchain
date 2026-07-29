@@ -97,7 +97,7 @@ test.describe("Merchant Flow", () => {
   test("merchant signup creates pending merchant", async ({ request }) => {
     const r = await request.post(`${BASE}/auth/merchant-signup`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { businessName: "Test Store", registrationNo: "REG-001" },
+      data: { businessName: "Test Store", registrationNo: "REG-001", vat: "VAT-001", pan: "PAN-001" },
     });
     expect(r.ok()).toBeTruthy();
     const b = await r.json();
@@ -197,7 +197,7 @@ test.describe("Admin & Analytics API", () => {
     const mrb = await mr.json();
     await request.post(`${BASE}/auth/merchant-signup`, {
       headers: { Authorization: `Bearer ${mrb.token}` },
-      data: { businessName: "Analytics Store", registrationNo: "REG-002" },
+      data: { businessName: "Analytics Store", registrationNo: "REG-002", vat: "VAT-002", pan: "PAN-002" },
     });
     const ar = await request.get(`${BASE}/analytics/merchant`, {
       headers: { Authorization: `Bearer ${mrb.token}` },

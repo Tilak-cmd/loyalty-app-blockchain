@@ -81,8 +81,54 @@ test.describe("Customer Auth Page", () => {
 test.describe("Merchant Auth Page", () => {
   test("loads with registration form", async ({ page }) => {
     await page.goto(`${BASE}/merchant/login`);
-    await expect(page.locator("text=Register Your Business")).toBeVisible();
-    await expect(page.getByText("Business Name *")).toBeVisible();
+    await expect(page.locator("text=Become a Merchant")).toBeVisible();
+    await expect(page.getByText("Legal Business Name")).toBeVisible();
+  });
+
+  test("registration form shows Company Registration, VAT, PAN fields", async ({ page }) => {
+    await page.goto(`${BASE}/merchant/login`);
+    await expect(page.locator("text=Company Registration Number")).toBeVisible();
+    await expect(page.locator("text=VAT Number")).toBeVisible();
+    await expect(page.locator("text=PAN Number")).toBeVisible();
+    await expect(page.locator("text=At least one of Company Registration No., VAT, or PAN is required")).toBeVisible();
+  });
+
+  test("validation: error when no registration field filled", async ({ page }) => {
+    await page.goto(`${BASE}/merchant/login`);
+    await page.locator('input[placeholder="e.g. Chia Pasal"]').fill("Test Store");
+    await page.getByRole("button", { name: "Continue Registration" }).click();
+    await expect(page.locator("text=At least one of Company Registration Number, VAT, or PAN is required")).toBeVisible();
+  });
+
+  test("validation: passes with registrationNo filled", async ({ page }) => {
+    await page.goto(`${BASE}/merchant/login`);
+    await page.locator('input[placeholder="e.g. Chia Pasal"]').fill("Test Store");
+    await page.locator('input[placeholder="e.g. REG-001"]').fill("REG-001");
+    const errorBefore = page.locator("text=At least one of Company Registration Number, VAT, or PAN is required");
+    await expect(errorBefore).not.toBeVisible();
+  });
+
+  test("validation: passes with VAT filled", async ({ page }) => {
+    await page.goto(`${BASE}/merchant/login`);
+    await page.locator('input[placeholder="e.g. Chia Pasal"]').fill("Test Store");
+    await page.locator('input[placeholder^="e.g. 123456789"]').first().fill("123456");
+    const errorBefore = page.locator("text=At least one of Company Registration Number, VAT, or PAN is required");
+    await expect(errorBefore).not.toBeVisible();
+  });
+
+  test("validation: passes with PAN filled", async ({ page }) => {
+    await page.goto(`${BASE}/merchant/login`);
+    await page.locator('input[placeholder="e.g. Chia Pasal"]').fill("Test Store");
+    await page.locator('input[placeholder^="e.g. 123456789"]').nth(1).fill("789012");
+    const errorBefore = page.locator("text=At least one of Company Registration Number, VAT, or PAN is required");
+    await expect(errorBefore).not.toBeVisible();
+  });
+
+  test("can switch to sign in mode", async ({ page }) => {
+    await page.goto(`${BASE}/merchant/login`);
+    await page.getByRole("button", { name: "Sign In", exact: true }).click();
+    await expect(page.locator("text=Merchant Sign In")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in with Email" })).toBeVisible();
   });
 });
 

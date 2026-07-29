@@ -16,6 +16,8 @@ export default function ApplyMerchant() {
   const [businessName, setBusinessName] = useState("");
   const [ownerName, setOwnerName] = useState(user?.name || "");
   const [regNo, setRegNo] = useState("");
+  const [vatNo, setVatNo] = useState("");
+  const [panNo, setPanNo] = useState("");
   const [citizenshipFile, setCitizenshipFile] = useState(null);
   const [docFiles, setDocFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,12 +26,18 @@ export default function ApplyMerchant() {
 
   const submit = async () => {
     if (!businessName.trim()) { setError("Business name is required"); return; }
+    if (!regNo.trim() && !vatNo.trim() && !panNo.trim()) {
+      setError("At least one of Company Registration No., VAT, or PAN is required");
+      return;
+    }
     setLoading(true); setError("");
     try {
       const formData = new FormData();
       formData.append("businessName", businessName.trim());
       formData.append("ownerName", ownerName.trim());
       formData.append("registrationNo", regNo.trim());
+      formData.append("vat", vatNo.trim());
+      formData.append("pan", panNo.trim());
       if (citizenshipFile) formData.append("citizenshipPhoto", citizenshipFile);
       docFiles.forEach((f) => formData.append("documents", f));
       await api.post("/auth/merchant-signup", formData, {
@@ -80,8 +88,17 @@ export default function ApplyMerchant() {
           </div>
           <div>
             <Label>Registration Number</Label>
-            <Input placeholder="REG-001" value={regNo} onChange={(e) => setRegNo(e.target.value)} />
+            <Input placeholder="e.g. REG-001" value={regNo} onChange={(e) => setRegNo(e.target.value)} />
           </div>
+          <div>
+            <Label>VAT Number</Label>
+            <Input placeholder="e.g. 123456789" value={vatNo} onChange={(e) => setVatNo(e.target.value)} />
+          </div>
+          <div>
+            <Label>PAN Number</Label>
+            <Input placeholder="e.g. 123456789" value={panNo} onChange={(e) => setPanNo(e.target.value)} />
+          </div>
+          <p className="text-xs text-gray-500 -mt-2">At least one of Company Registration No., VAT, or PAN is required</p>
 
           <div>
             <Label>Citizenship Photo</Label>
